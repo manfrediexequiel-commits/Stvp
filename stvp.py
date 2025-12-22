@@ -4,6 +4,30 @@ import qrcode
 from io import BytesIO
 from fpdf import FPDF
 import os
+import streamlit as st
+import pandas as pd
+
+# --- CONFIGURACIÓN DE LOS LINKS DE GOOGLE SHEETS ---
+# Extraídos de tus enlaces: 1j-OZfPahquiCpOVIkys5zYFG5jqwcKVc y 1OHbeZDXHZZs6DOGeYJNYTUnyMz8IOgVt
+ID_SOCIOS = "1j-OZfPahquiCpOVIkys5zYFG5jqwcKVc"
+ID_FAMILIA = "1OHbeZDXHZZs6DOGeYJNYTUnyMz8IOgVt"
+
+# Construcción de links para descarga directa de CSV
+URL_SOCIOS = f"https://docs.google.com/spreadsheets/d/{ID_SOCIOS}/export?format=csv"
+URL_FAMILIA = f"https://docs.google.com/spreadsheets/d/{ID_FAMILIA}/export?format=csv"
+
+@st.cache_data(ttl=300) # Se actualiza cada 5 minutos
+def cargar_datos():
+    try:
+        # Forzamos que los DNI sean tratados como texto para no perder ceros a la izquierda
+        df_s = pd.read_csv(URL_SOCIOS, dtype={'DNI': str})
+        df_f = pd.read_csv(URL_FAMILIA, dtype={'DNI_Titular': str, 'DNI_Familiar': str})
+        return df_s, df_f
+    except Exception as e:
+        st.error(f"Error al conectar con Google Sheets: {e}")
+        return pd.DataFrame(), pd.DataFrame()
+
+db_socios, db_familia = cargar_datos()
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="SINDICATO STVP - Credencial Digital", page_icon="🛡️", layout="centered")
