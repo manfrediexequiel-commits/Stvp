@@ -1,90 +1,64 @@
 import streamlit as st
 import pandas as pd
-import qrcode
-from io import BytesIO
 from fpdf import FPDF
 import os
-import streamlit as st
-import pandas as pd
-
-# --- CONFIGURACIÓN DE LOS LINKS DE GOOGLE SHEETS ---
-# Extraídos de tus enlaces: 1j-OZfPahquiCpOVIkys5zYFG5jqwcKVc y 1OHbeZDXHZZs6DOGeYJNYTUnyMz8IOgVt
-ID_SOCIOS = "1j-OZfPahquiCpOVIkys5zYFG5jqwcKVc"
-ID_FAMILIA = "1OHbeZDXHZZs6DOGeYJNYTUnyMz8IOgVt"
-
-# Construcción de links para descarga directa de CSV
-URL_SOCIOS = f"https://docs.google.com/spreadsheets/d/{ID_SOCIOS}/export?format=csv"
-URL_FAMILIA = f"https://docs.google.com/spreadsheets/d/{ID_FAMILIA}/export?format=csv"
-
-@st.cache_data(ttl=300) # Se actualiza cada 5 minutos
-def cargar_datos():
-    try:
-        # Forzamos que los DNI sean tratados como texto para no perder ceros a la izquierda
-        df_s = pd.read_csv(URL_SOCIOS, dtype={'DNI': str})
-        df_f = pd.read_csv(URL_FAMILIA, dtype={'DNI_Titular': str, 'DNI_Familiar': str})
-        return df_s, df_f
-    except Exception as e:
-        st.error(f"Error al conectar con Google Sheets: {e}")
-        return pd.DataFrame(), pd.DataFrame()
-
-db_socios, db_familia = cargar_datos()
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="SINDICATO STVP - Credencial Digital", page_icon="🛡️", layout="centered")
 
-# --- ENLACES DE GOOGLE SHEETS (Reemplaza con tus links de "Publicar en la Web") ---
-URL_SOCIOS = "https://drive.google.com/file/d/1j-OZfPahquiCpOVIkys5zYFG5jqwcKVc/view?usp=drivesdk"
-URL_FAMILIA = "https://drive.google.com/file/d/1OHbeZDXHZZs6DOGeYJNYTUnyMz8IOgVt/view?usp=drivesdk"
+# --- ENLACES DE GOOGLE SHEETS (Convertidos a exportación directa CSV) ---
+ID_SOCIOS = "1j-OZfPahquiCpOVIkys5zYFG5jqwcKVc"
+ID_FAMILIA = "1OHbeZDXHZZs6DOGeYJNYTUnyMz8IOgVt"
 
-# --- FUNCIONES DE CARGA Y PROCESAMIENTO ---
-@st.cache_data(ttl=600)  # Se actualiza cada 10 min
+URL_SOCIOS = f"https://docs.google.com/spreadsheets/d/{ID_SOCIOS}/export?format=csv"
+URL_FAMILIA = f"https://docs.google.com/spreadsheets/d/{ID_FAMILIA}/export?format=csv"
+
+# --- FUNCIONES DE CARGA ---
+@st.cache_data(ttl=600)
 def cargar_datos():
     try:
         df_s = pd.read_csv(URL_SOCIOS, dtype={'DNI': str})
         df_f = pd.read_csv(URL_FAMILIA, dtype={'DNI_Titular': str, 'DNI_Familiar': str})
         return df_s, df_f
-    except:
-        # Datos de prueba por si los links fallan inicialmente
-        df_s = pd.DataFrame([{"DNI": "123", "Nombre": "SOCIO DE PRUEBA", "Vence": "2026-12-31", "Miembro": "AFILIADO ACTIVO", "Cargo": "N/A"}])
-        df_f = pd.DataFrame([{"DNI_Titular": "123", "Nombre": "FAMILIAR PRUEBA", "Parentesco": "Hijo", "DNI_Familiar": "456"}])
-        return df_s, df_f
+    except Exception as e:
+        # Datos de respaldo si la conexión falla
+        return pd.DataFrame(), pd.DataFrame()
 
 def generar_pdf_titular(s, path_logo):
     pdf = FPDF(orientation='L', unit='mm', format=(54, 86))
     pdf.add_page()
     
-    # Color según categoría: Dorado para Directiva, Azul para Afiliados
-    color = (133, 77, 14) if s['Miembro'] == "COMISIÓN DIRECTIVA" else (30, 58, 138)
+    # Lógica de colores para el PDF
+    if s['Miembro'] == "COMISIÓN DIRECTIVA":
+        color = (133, 77, 14) # Dorado/Marrón
+    elif s['Miembro'] == "DELEGADO":
+        color = (6, 78, 59) # Verde Oscuro
+    else:
+        color = (30, 58, 138) # Azul
+        
     pdf.set_fill_color(*color)
     pdf.rect(0, 0, 86, 54, 'F')
-    
-    # Logo
     if os.path.exists(path_logo):
         pdf.image(path_logo, 5, 5, 12)
     
-    # Encabezado
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Arial", 'B', 10)
     pdf.set_xy(18, 6)
     pdf.cell(0, 5, "SINDICATO STVP", ln=True)
     
-    # Nombre
     pdf.set_y(18)
     pdf.set_font("Arial", 'B', 11)
-    pdf.cell(0, 8, s['Nombre'].upper(), ln=True, align='C')
+    pdf.cell(0, 8, str(s['Nombre']).upper(), ln=True, align='C')
     
-    # Cargo / Miembro
     pdf.set_font("Arial", 'B', 8)
-    pdf.set_text_color(253, 224, 71) # Amarillo
+    pdf.set_text_color(253, 224, 71)
     cargo = s['Cargo'] if s['Miembro'] == "COMISIÓN DIRECTIVA" else s['Miembro']
-    pdf.cell(0, 5, cargo, ln=True, align='C')
+    pdf.cell(0, 5, str(cargo), ln=True, align='C')
     
-    # Datos Pie
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Arial", '', 7)
     pdf.set_y(42)
     pdf.cell(0, 5, f"DNI: {s['DNI']} | VENCE: {s['Vence']}", ln=True, align='C')
-    
     return pdf.output(dest='S').encode('latin-1')
 
 # --- INICIALIZACIÓN ---
@@ -94,8 +68,7 @@ path_logo = "logo_stvp.png"
 if "dni_activo" not in st.session_state:
     st.session_state["dni_activo"] = None
 
-# --- INTERFAZ DE USUARIO ---
-# Logo superior izquierda
+# --- INTERFAZ ---
 col_l, col_r = st.columns([1, 4])
 with col_l:
     if os.path.exists(path_logo):
@@ -103,74 +76,68 @@ with col_l:
 
 st.title("🛡️ Credencial Digital STVP")
 
-# FLUJO DE LOGIN / CONSULTA
 if st.session_state["dni_activo"] is None:
     st.markdown("### Bienvenido al portal del afiliado")
-    dni_input = st.text_input("Ingrese su DNI para validar:")
-    if st.button("Consultar Credencial"):
-        if dni_input:
-            st.session_state["dni_activo"] = dni_input
-            st.rerun()
+    dni_input = st.text_input("Ingrese su DNI:")
+    if st.button("Consultar"):
+        st.session_state["dni_activo"] = dni_input
+        st.rerun()
 else:
     dni = st.session_state["dni_activo"]
     socio = db_socios[db_socios["DNI"].astype(str) == str(dni)]
     
     if not socio.empty:
         s = socio.iloc[0]
-        es_directiva = s['Miembro'] == "COMISIÓN DIRECTIVA"
         
-        # Diseño de la tarjeta en pantalla
-        bg_card = "linear-gradient(135deg, #854d0e 0%, #422006 100%)" if es_directiva else "linear-gradient(135deg, #1e3a8a 0%, #172554 100%)"
-        border_color = "#fbbf24" if es_directiva else "#3b82f6"
-        
+        # Definición de colores según jerarquía
+        if s['Miembro'] == "COMISIÓN DIRECTIVA":
+            bg_card = "linear-gradient(135deg, #854d0e 0%, #422006 100%)"
+            border = "#fbbf24"
+        elif s['Miembro'] == "DELEGADO":
+            bg_card = "linear-gradient(135deg, #065f46 0%, #064e3b 100%)"
+            border = "#6ee7b7"
+        else:
+            bg_card = "linear-gradient(135deg, #1e3a8a 0%, #172554 100%)"
+            border = "#3b82f6"
+
         st.markdown(f"""
-            <div style="background: {bg_card}; color: white; padding: 25px; border-radius: 15px; border: 3px solid {border_color}; text-align: center; box-shadow: 0px 4px 15px rgba(0,0,0,0.3);">
+            <div style="background: {bg_card}; color: white; padding: 25px; border-radius: 15px; border: 3px solid {border}; text-align: center;">
                 <p style="text-align: left; font-size: 0.7em; letter-spacing: 2px; margin: 0;">SINDICATO STVP</p>
                 <h1 style="margin: 15px 0; font-size: 1.8em;">{s['Nombre']}</h1>
                 <p style="background: rgba(255,255,255,0.1); display: inline-block; padding: 5px 15px; border-radius: 5px; font-weight: bold; color: #fde047;">
-                    {s['Cargo'] if es_directiva else s['Miembro']}
+                    {s['Cargo'] if s['Miembro'] == "COMISIÓN DIRECTIVA" else s['Miembro']}
                 </p>
-                <hr style="opacity: 0.2; margin: 20px 0;">
-                <p style="margin: 0;">DNI: {s['DNI']} | Vencimiento: {s['Vence']}</p>
+                <p style="margin-top: 20px; font-size: 0.9em;">DNI: {s['DNI']} | Vence: {s['Vence']}</p>
             </div>
         """, unsafe_allow_html=True)
         
-        # Botones de Acción
-        st.write("")
-        c1, c2 = st.columns(2)
-        with c1:
+        col1, col2 = st.columns(2)
+        with col1:
             pdf_bytes = generar_pdf_titular(s, path_logo)
-            st.download_button(label="📥 Descargar PDF", data=pdf_bytes, file_name=f"STVP_{dni}.pdf", mime="application/pdf", use_container_width=True)
-        with c2:
+            st.download_button("📥 Descargar PDF", pdf_bytes, f"STVP_{dni}.pdf", "application/pdf", use_container_width=True)
+        with col2:
             if st.button("❌ Cerrar Sesión", use_container_width=True):
                 st.session_state["dni_activo"] = None
                 st.rerun()
         
-        # Grupo Familiar
         st.markdown("---")
-        st.subheader("👨‍👩‍👧‍👦 Grupo Familiar Vinculado")
+        st.subheader("👨‍👩‍👧‍👦 Grupo Familiar")
         familiares = db_familia[db_familia["DNI_Titular"].astype(str) == str(dni)]
         if not familiares.empty:
             for _, f in familiares.iterrows():
                 st.info(f"**{f['Nombre']}** - {f['Parentesco']} (DNI: {f['DNI_Familiar']})")
         else:
-            st.warning("No se encontraron familiares registrados.")
-            
+            st.warning("No hay familiares vinculados.")
     else:
-        st.error("DNI no encontrado en el padrón actual.")
-        if st.button("Volver a intentar"):
+        st.error("DNI no encontrado.")
+        if st.button("Reintentar"):
             st.session_state["dni_activo"] = None
             st.rerun()
 
-# --- PANEL DE ADMINISTRACIÓN (OPCIONAL) ---
+# Panel Admin en Sidebar
 with st.sidebar:
-    st.write("---")
-    if st.checkbox("Acceso Administrador"):
-        pass_admin = st.text_input("Clave", type="password")
-        if pass_admin == "stvp2025":
-            st.success("Conectado a Google Sheets")
-            st.write("**Resumen de Padrón:**")
-            st.write(f"Total Afiliados: {len(db_socios)}")
-            if st.button("Forzar Actualización de Datos"):
+    if st.checkbox("Admin"):
+        if st.text_input("Clave", type="password") == "stvp2025":
+            if st.button("Actualizar Datos"):
                 st.cache_data.clear()
                 st.rerun()
