@@ -9,8 +9,8 @@ import os
 st.set_page_config(page_title="SINDICATO STVP - Credencial Digital", page_icon="🛡️", layout="centered")
 
 # --- ENLACES DE GOOGLE SHEETS (Reemplaza con tus links de "Publicar en la Web") ---
-URL_SOCIOS = "TU_LINK_CSV_HOJA_SOCIOS"
-URL_FAMILIA = "TU_LINK_CSV_HOJA_FAMILIA"
+URL_SOCIOS = "https://drive.google.com/file/d/1j-OZfPahquiCpOVIkys5zYFG5jqwcKVc/view?usp=drivesdk"
+URL_FAMILIA = "https://drive.google.com/file/d/1OHbeZDXHZZs6DOGeYJNYTUnyMz8IOgVt/view?usp=drivesdk"
 
 # --- FUNCIONES DE CARGA Y PROCESAMIENTO ---
 @st.cache_data(ttl=600)  # Se actualiza cada 10 min
