@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 from io import StringIO
+import os
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
@@ -56,15 +57,29 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- SVG LOGO (Para asegurar visibilidad sin depender de URLs externas) ---
-LOGO_SVG = """
-<div class="logo-container">
-    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 22C12 22 20 18 20 12V5L12 2L4 5V12C4 18 12 22 12 22Z" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="#2563eb33"/>
-        <path d="M9 12L11 14L15 10" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-</div>
-"""
+# --- FUNCIÓN PARA MOSTRAR EL LOGO ---
+def mostrar_logo():
+    # Intenta cargar el archivo local logo_stvp (con extensiones comunes)
+    posibles_extensiones = ['png', 'jpg', 'jpeg', 'webp']
+    logo_encontrado = False
+    
+    for ext in posibles_extensiones:
+        ruta = f"logo_stvp.{ext}"
+        if os.path.exists(ruta):
+            st.image(ruta, width=120)
+            logo_encontrado = True
+            break
+    
+    # Fallback en caso de que no encuentre el archivo local
+    if not logo_encontrado:
+        st.markdown("""
+        <div class="logo-container">
+            <svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 22C12 22 20 18 20 12V5L12 2L4 5V12C4 18 12 22 12 22Z" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="#2563eb33"/>
+                <path d="M9 12L11 14L15 10" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        """, unsafe_allow_html=True)
 
 # --- ENLACES DE GOOGLE SHEETS (Exportación directa CSV) ---
 URL_SOCIOS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRT80rJKxr62o2RBs5PpaCvpWbyH2B14dk1Gv610WH3QPoeQi2akdeu4Kgo97Mtq-QOmB8d3ORap8-n/pub?gid=0&single=true&output=csv"
@@ -104,8 +119,11 @@ db_socios, db_familia = cargar_datos()
 if "dni_activo" not in st.session_state:
     st.session_state["dni_activo"] = None
 
-# Encabezado con Logo SVG
-st.markdown(LOGO_SVG, unsafe_allow_html=True)
+# Encabezado con Logo (Local o SVG de respaldo)
+col1, col2, col3 = st.columns([1, 2, 1])
+with col2:
+    mostrar_logo()
+
 st.markdown("<h1 style='text-align: center; color: white; margin-top: -10px;'>STVP Digital</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #94a3b8;'>Sindicato de Trabajadores de Vigilancia Privada</p>", unsafe_allow_html=True)
 
@@ -118,7 +136,6 @@ if st.session_state["dni_activo"] is None:
         
         if st.button("Consultar Padrón"):
             if dni_input:
-                # Normalizamos DNI a string para comparar
                 socio = db_socios[db_socios['dni'].astype(str) == str(dni_input)]
                 if not socio.empty:
                     st.session_state["dni_activo"] = str(dni_input)
@@ -134,7 +151,6 @@ else:
     
     bg_color, border_color = get_card_style(socio.get('miembro', socio.get('cargo', 'Afiliado')))
     
-    # Render de la Tarjeta (HTML/CSS)
     st.markdown(f"""
         <div class="credential-card" style="background: {bg_color}; border: 2px solid {border_color};">
             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
@@ -160,7 +176,6 @@ else:
         </div>
     """, unsafe_allow_html=True)
     
-    # Grupo Familiar
     st.subheader("👨‍👩‍👧‍👦 Grupo Familiar")
     familiares = db_familia[db_familia['dni_titular'].astype(str) == str(dni)]
     
