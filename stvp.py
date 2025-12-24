@@ -35,8 +35,10 @@ st.markdown("""
         padding: 25px;
         margin-bottom: 20px;
         color: white;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
         border: 1px solid rgba(255,255,255,0.1);
+        position: relative;
+        overflow: hidden;
     }
     .family-card {
         background-color: #1e293b;
@@ -45,8 +47,24 @@ st.markdown("""
         margin-bottom: 10px;
         border-left: 5px solid #3b82f6;
     }
+    .logo-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 20px;
+    }
     </style>
 """, unsafe_allow_html=True)
+
+# --- SVG LOGO (Para asegurar visibilidad sin depender de URLs externas) ---
+LOGO_SVG = """
+<div class="logo-container">
+    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 22C12 22 20 18 20 12V5L12 2L4 5V12C4 18 12 22 12 22Z" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="#2563eb33"/>
+        <path d="M9 12L11 14L15 10" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+</div>
+"""
 
 # --- ENLACES DE GOOGLE SHEETS (Exportación directa CSV) ---
 URL_SOCIOS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRT80rJKxr62o2RBs5PpaCvpWbyH2B14dk1Gv610WH3QPoeQi2akdeu4Kgo97Mtq-QOmB8d3ORap8-n/pub?gid=0&single=true&output=csv"
@@ -59,7 +77,6 @@ def cargar_datos():
         # Cargar Socios
         res_s = requests.get(URL_SOCIOS)
         df_s = pd.read_csv(StringIO(res_s.text))
-        # Limpiar nombres de columnas (quitar espacios y poner en minúsculas)
         df_s.columns = df_s.columns.str.strip().str.lower()
         
         # Cargar Familia
@@ -87,13 +104,15 @@ db_socios, db_familia = cargar_datos()
 if "dni_activo" not in st.session_state:
     st.session_state["dni_activo"] = None
 
-# Encabezado
-st.markdown("<h1 style='text-align: center; color: white;'>🛡️ STVP Digital</h1>", unsafe_allow_html=True)
+# Encabezado con Logo SVG
+st.markdown(LOGO_SVG, unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: white; margin-top: -10px;'>STVP Digital</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #94a3b8;'>Sindicato de Trabajadores de Vigilancia Privada</p>", unsafe_allow_html=True)
 
 if st.session_state["dni_activo"] is None:
     # Vista de Login
     with st.container():
+        st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("### Acceso al Portal")
         dni_input = st.text_input("Ingrese su DNI (sin puntos):", placeholder="Ej: 12345678")
         
@@ -120,7 +139,7 @@ else:
         <div class="credential-card" style="background: {bg_color}; border: 2px solid {border_color};">
             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                 <div style="font-size: 0.7em; font-weight: bold; letter-spacing: 2px; opacity: 0.8;">SINDICATO STVP</div>
-                <div style="font-size: 0.6em; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 5px;">2025</div>
+                <div style="font-size: 0.6em; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 5px;">VIGENTE 2025</div>
             </div>
             <div style="text-align: center; margin: 30px 0;">
                 <h2 style="margin: 0; font-size: 1.8em; text-transform: uppercase; color: white;">{socio['nombre']}</h2>
@@ -130,12 +149,12 @@ else:
             </div>
             <div style="display: flex; justify-content: space-between; font-size: 0.8em; opacity: 0.9;">
                 <div>
-                    <div style="font-size: 0.7em; opacity: 0.6;">DNI</div>
+                    <div style="font-size: 0.7em; opacity: 0.6;">DOCUMENTO</div>
                     <div style="font-weight: bold;">{socio['dni']}</div>
                 </div>
                 <div style="text-align: right;">
                     <div style="font-size: 0.7em; opacity: 0.6;">ESTADO</div>
-                    <div style="font-weight: bold; color: #4ade80;">AL DÍA</div>
+                    <div style="font-weight: bold; color: #4ade80;">ACTIVO</div>
                 </div>
             </div>
         </div>
@@ -154,7 +173,7 @@ else:
                 </div>
             """, unsafe_allow_html=True)
     else:
-        st.info("No hay familiares vinculados a este titular.")
+        st.info("No se encuentran familiares vinculados en el padrón.")
 
     st.write("---")
     if st.button("❌ Cerrar Sesión"):
@@ -163,14 +182,15 @@ else:
 
 # Barra lateral Admin
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/508/508757.png", width=50)
-    st.title("Sistema Admin")
-    if st.checkbox("Mantenimiento"):
-        pwd = st.text_input("Clave:", type="password")
+    st.markdown("### ⚙️ Panel de Control")
+    if st.checkbox("Acceso Administrador"):
+        pwd = st.text_input("Contraseña:", type="password")
         if pwd == "stvp2025":
-            if st.button("Forzar Actualización de Datos"):
+            st.success("Acceso Concedido")
+            if st.button("🔄 Sincronizar con Google Sheets"):
                 st.cache_data.clear()
-                st.success("Datos actualizados de Google Sheets")
+                st.success("Padrón actualizado correctamente")
                 st.rerun()
-            st.write(f"Socios cargados: {len(db_socios)}")
-            st.write(f"Familias cargadas: {len(db_familia)}")
+            
+            st.metric("Total Afiliados", len(db_socios))
+            st.metric("Total Familiares", len(db_familia))
