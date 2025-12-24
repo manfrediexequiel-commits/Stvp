@@ -3,6 +3,7 @@ import pandas as pd
 import requests
 from io import StringIO
 import os
+import base64
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
@@ -40,6 +41,22 @@ st.markdown("""
         border: 1px solid rgba(255,255,255,0.1);
         position: relative;
         overflow: hidden;
+        min-height: 220px;
+    }
+    /* Estilo para el logo de fondo (Marca de agua) */
+    .watermark {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) rotate(-15deg);
+        width: 180px;
+        opacity: 0.15;
+        pointer-events: none;
+        z-index: 0;
+    }
+    .card-content {
+        position: relative;
+        z-index: 10;
     }
     .family-card {
         background-color: #1e293b;
@@ -57,21 +74,22 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- FUNCIÓN PARA MOSTRAR EL LOGO ---
-def mostrar_logo():
-    # Intenta cargar el archivo local logo_stvp (con extensiones comunes)
-    posibles_extensiones = ['png', 'jpg', 'jpeg', 'webp']
-    logo_encontrado = False
-    
-    for ext in posibles_extensiones:
-        ruta = f"logo_stvp.{ext}"
-        if os.path.exists(ruta):
-            st.image(ruta, width=120)
-            logo_encontrado = True
-            break
-    
-    # Fallback en caso de que no encuentre el archivo local
-    if not logo_encontrado:
+# --- FUNCIÓN PARA OBTENER IMAGEN EN BASE64 ---
+def get_image_base64(path_no_ext):
+    posibles_ext = ['png', 'jpg', 'jpeg', 'webp']
+    for ext in posibles_ext:
+        full_path = f"{path_no_ext}.{ext}"
+        if os.path.exists(full_path):
+            with open(full_path, "rb") as img_file:
+                return f"data:image/{ext};base64," + base64.b64encode(img_file.read()).decode()
+    return None
+
+# --- FUNCIÓN PARA MOSTRAR EL LOGO SUPERIOR ---
+def mostrar_logo_cabecera():
+    b64 = get_image_base64("logo_stvp")
+    if b64:
+        st.image(b64, width=120)
+    else:
         st.markdown("""
         <div class="logo-container">
             <svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -81,20 +99,18 @@ def mostrar_logo():
         </div>
         """, unsafe_allow_html=True)
 
-# --- ENLACES DE GOOGLE SHEETS (Exportación directa CSV) ---
+# --- ENLACES DE GOOGLE SHEETS ---
 URL_SOCIOS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRT80rJKxr62o2RBs5PpaCvpWbyH2B14dk1Gv610WH3QPoeQi2akdeu4Kgo97Mtq-QOmB8d3ORap8-n/pub?gid=0&single=true&output=csv"
 URL_FAMILIA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRT80rJKxr62o2RBs5PpaCvpWbyH2B14dk1Gv610WH3QPoeQi2akdeu4Kgo97Mtq-QOmB8d3ORap8-n/pub?gid=1889067091&single=true&output=csv"
 
-# --- FUNCIONES DE CARGA ---
+# --- CARGA DE DATOS ---
 @st.cache_data(ttl=600)
 def cargar_datos():
     try:
-        # Cargar Socios
         res_s = requests.get(URL_SOCIOS)
         df_s = pd.read_csv(StringIO(res_s.text))
         df_s.columns = df_s.columns.str.strip().str.lower()
         
-        # Cargar Familia
         res_f = requests.get(URL_FAMILIA)
         df_f = pd.read_csv(StringIO(res_f.text))
         df_f.columns = df_f.columns.str.strip().str.lower()
@@ -113,22 +129,22 @@ def get_card_style(miembro):
     else:
         return "linear-gradient(135deg, #1e3a8a 0%, #172554 100%)", "#3b82f6"
 
-# --- LÓGICA DE LA APP ---
+# --- INICIO DE APP ---
 db_socios, db_familia = cargar_datos()
 
 if "dni_activo" not in st.session_state:
     st.session_state["dni_activo"] = None
 
-# Encabezado con Logo (Local o SVG de respaldo)
+# Encabezado
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
-    mostrar_logo()
+    mostrar_logo_cabecera()
 
 st.markdown("<h1 style='text-align: center; color: white; margin-top: -10px;'>STVP Digital</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #94a3b8;'>Sindicato de Trabajadores de Vigilancia Privada</p>", unsafe_allow_html=True)
 
 if st.session_state["dni_activo"] is None:
-    # Vista de Login
+    # Vista Login
     with st.container():
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("### Acceso al Portal")
@@ -145,37 +161,46 @@ if st.session_state["dni_activo"] is None:
             else:
                 st.warning("Por favor, ingrese un número de documento.")
 else:
-    # Vista de Credencial
+    # Vista Credencial
     dni = st.session_state["dni_activo"]
     socio = db_socios[db_socios['dni'].astype(str) == str(dni)].iloc[0]
     
     bg_color, border_color = get_card_style(socio.get('miembro', socio.get('cargo', 'Afiliado')))
     
+    # Preparamos el logo de fondo
+    logo_b64 = get_image_base64("logo_stvp")
+    watermark_html = f'<img src="{logo_b64}" class="watermark">' if logo_b64 else ''
+
+    # HTML de la Credencial
     st.markdown(f"""
         <div class="credential-card" style="background: {bg_color}; border: 2px solid {border_color};">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div style="font-size: 0.7em; font-weight: bold; letter-spacing: 2px; opacity: 0.8;">SINDICATO STVP</div>
-                <div style="font-size: 0.6em; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 5px;">VIGENTE 2025</div>
-            </div>
-            <div style="text-align: center; margin: 30px 0;">
-                <h2 style="margin: 0; font-size: 1.8em; text-transform: uppercase; color: white;">{socio['nombre']}</h2>
-                <div style="margin-top: 10px; display: inline-block; background: rgba(0,0,0,0.3); padding: 5px 15px; border-radius: 50px; font-size: 0.8em; font-weight: bold; color: {border_color}; border: 1px solid {border_color};">
-                    {socio.get('cargo', socio.get('miembro', 'AFILIADO'))}
+            {watermark_html}
+            <div class="card-content">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div style="font-size: 0.7em; font-weight: bold; letter-spacing: 2px; opacity: 0.8;">SINDICATO STVP</div>
+                    <div style="font-size: 0.6em; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 5px;">VIGENTE 2025</div>
                 </div>
-            </div>
-            <div style="display: flex; justify-content: space-between; font-size: 0.8em; opacity: 0.9;">
-                <div>
-                    <div style="font-size: 0.7em; opacity: 0.6;">DOCUMENTO</div>
-                    <div style="font-weight: bold;">{socio['dni']}</div>
+                <div style="text-align: center; margin: 30px 0;">
+                    <h2 style="margin: 0; font-size: 1.8em; text-transform: uppercase; color: white; text-shadow: 1px 1px 4px rgba(0,0,0,0.5);">{socio['nombre']}</h2>
+                    <div style="margin-top: 10px; display: inline-block; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 50px; font-size: 0.8em; font-weight: bold; color: {border_color}; border: 1px solid {border_color};">
+                        {socio.get('cargo', socio.get('miembro', 'AFILIADO'))}
+                    </div>
                 </div>
-                <div style="text-align: right;">
-                    <div style="font-size: 0.7em; opacity: 0.6;">ESTADO</div>
-                    <div style="font-weight: bold; color: #4ade80;">ACTIVO</div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.8em; opacity: 0.9;">
+                    <div>
+                        <div style="font-size: 0.7em; opacity: 0.6;">DOCUMENTO</div>
+                        <div style="font-weight: bold;">{socio['dni']}</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 0.7em; opacity: 0.6;">ESTADO</div>
+                        <div style="font-weight: bold; color: #4ade80;">ACTIVO</div>
+                    </div>
                 </div>
             </div>
         </div>
     """, unsafe_allow_html=True)
     
+    # Grupo Familiar
     st.subheader("👨‍👩‍👧‍👦 Grupo Familiar")
     familiares = db_familia[db_familia['dni_titular'].astype(str) == str(dni)]
     
