@@ -83,6 +83,16 @@ st.markdown("""
         padding: 15px;
         margin-bottom: 10px;
         border: 1px solid rgba(59, 130, 246, 0.2);
+        transition: transform 0.2s;
+    }
+    .benefit-item:hover {
+        transform: scale(1.02);
+        border-color: #3b82f6;
+    }
+    
+    .link-benefit {
+        text-decoration: none;
+        color: inherit;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -218,20 +228,33 @@ else:
 
     elif st.session_state["seccion"] == "beneficios":
         st.subheader("🎁 Beneficios Exclusivos")
+        
+        # Lista de beneficios con links opcionales
         items = [
-            ("🏨 Turismo", "Hotelería propia y convenios en todo el país."),
-            ("💊 Farmacias", "Descuentos adicionales en red de farmacias."),
-            ("📚 Útiles", "Entrega de kits escolares anuales."),
-            ("🎁 Nacimiento", "Ajuar para el recién nacido."),
-            ("⚖️ Asesoría", "Consultas legales gratuitas para afiliados.")
+            ("🏨 Turismo - Rolsolviajes", "Hotelería propia y convenios en todo el país. Acceda a las ofertas vigentes.", "https://whatsapp.com/channel/0029VbAua9BJENy8oScpAH2B"),
+            ("💊 Farmacias", "Descuentos adicionales en red de farmacias.", None),
+            ("📚 Útiles", "Entrega de kits escolares anuales.", None),
+            ("🎁 Nacimiento", "Ajuar para el recién nacido.", None),
+            ("⚖️ Asesoría", "Consultas legales gratuitas para afiliados.", None)
         ]
-        for t, d in items:
-            st.markdown(f"""
-                <div class="benefit-item">
-                    <div style="font-weight: bold; color: #3b82f6;">{t}</div>
-                    <div style="font-size: 0.85em; color: #94a3b8;">{d}</div>
-                </div>
-            """, unsafe_allow_html=True)
+        
+        for t, d, link in items:
+            if link:
+                st.markdown(f"""
+                    <a href="{link}" target="_blank" class="link-benefit">
+                        <div class="benefit-item">
+                            <div style="font-weight: bold; color: #3b82f6;">{t} 🔗</div>
+                            <div style="font-size: 0.85em; color: #94a3b8;">{d} <br> <span style="color:#25D366; font-size:0.9em;">(Ver canal de WhatsApp)</span></div>
+                        </div>
+                    </a>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown(f"""
+                    <div class="benefit-item">
+                        <div style="font-weight: bold; color: #3b82f6;">{t}</div>
+                        <div style="font-size: 0.85em; color: #94a3b8;">{d}</div>
+                    </div>
+                """, unsafe_allow_html=True)
 
     if st.sidebar.button("❌ Cerrar Sesión"):
         st.session_state["dni_activo"] = None
