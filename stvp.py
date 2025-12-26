@@ -14,26 +14,31 @@ st.set_page_config(
     layout="centered"
 )
 
-# --- ESTILOS PERSONALIZADOS (CSS) ---
+# --- ESTILOS PERSONALIZADOS (CSS MEJORADO) ---
 st.markdown("""
     <style>
     .main {
         background-color: #0f172a;
     }
     
+    /* Botones de menú */
     .stButton>button {
         width: 100%;
         border-radius: 12px;
-        height: 3em;
+        height: 3.2em;
         background-color: #2563eb;
         color: white;
         font-weight: bold;
         border: none;
+        transition: all 0.3s ease;
     }
     .stButton>button:hover {
         background-color: #1d4ed8;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
     }
 
+    /* Credencial con Efectos (Mejora 2) */
     .credential-card {
         border-radius: 20px;
         padding: 30px;
@@ -43,6 +48,12 @@ st.markdown("""
         border: 1px solid rgba(255,255,255,0.1);
         position: relative;
         overflow: hidden;
+        user-select: none;
+        transition: all 0.4s ease;
+    }
+    .credential-card:hover {
+        box-shadow: 0 15px 35px rgba(59, 130, 246, 0.3);
+        transform: scale(1.01);
     }
 
     .watermark {
@@ -56,12 +67,15 @@ st.markdown("""
         z-index: 0;
     }
 
-    .card-content {
-        position: relative;
-        z-index: 10;
-        text-align: center;
+    /* Botón Cerrar Sesión Rojo (Mejora 4) */
+    .logout-btn > div > button {
+        background-color: #ef4444 !important;
+        margin-top: 20px;
     }
-    
+    .logout-btn > div > button:hover {
+        background-color: #dc2626 !important;
+    }
+
     .family-card {
         background-color: #1e293b;
         border-radius: 15px;
@@ -76,23 +90,12 @@ st.markdown("""
         padding: 15px;
         margin-bottom: 10px;
         border: 1px solid rgba(59, 130, 246, 0.2);
-        transition: transform 0.2s;
-    }
-    .benefit-item:hover {
-        transform: scale(1.02);
-        border-color: #3b82f6;
-    }
-    
-    .link-benefit {
-        text-decoration: none;
-        color: inherit;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- UTILIDADES PARA IMÁGENES ---
+# --- UTILIDADES ---
 def get_image_base64(path_no_ext):
-    """Convierte una imagen local a Base64 para usar en HTML."""
     posibles_ext = ['png', 'jpg', 'jpeg', 'webp']
     for ext in posibles_ext:
         full_path = f"{path_no_ext}.{ext}"
@@ -108,7 +111,7 @@ def mostrar_logo_cabecera():
     else:
         st.markdown('<div style="text-align:center"><h2 style="color:#2563eb">STVP</h2></div>', unsafe_allow_html=True)
 
-# --- CARGA DE DATOS ---
+# --- CARGA DE DATOS NORMALIZADA (Mejora 1) ---
 URL_SOCIOS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRT80rJKxr62o2RBs5PpaCvpWbyH2B14dk1Gv610WH3QPoeQi2akdeu4Kgo97Mtq-QOmB8d3ORap8-n/pub?gid=0&single=true&output=csv"
 URL_FAMILIA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRT80rJKxr62o2RBs5PpaCvpWbyH2B14dk1Gv610WH3QPoeQi2akdeu4Kgo97Mtq-QOmB8d3ORap8-n/pub?gid=1889067091&single=true&output=csv"
 
@@ -119,8 +122,17 @@ def cargar_datos():
         res_f = requests.get(URL_FAMILIA)
         df_s = pd.read_csv(StringIO(res_s.text))
         df_f = pd.read_csv(StringIO(res_f.text))
+        
+        # Limpieza de columnas
         df_s.columns = df_s.columns.str.strip().str.lower()
         df_f.columns = df_f.columns.str.strip().str.lower()
+        
+        # Normalización de DNIs: Eliminar .0 y espacios
+        for df in [df_s, df_f]:
+            col_dni = 'dni' if 'dni' in df.columns else 'dni_titular'
+            if col_dni in df.columns:
+                df[col_dni] = df[col_dni].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+        
         return df_s, df_f
     except:
         return pd.DataFrame(), pd.DataFrame()
@@ -133,27 +145,29 @@ if "dni_activo" not in st.session_state:
 if "seccion" not in st.session_state:
     st.session_state["seccion"] = "credencial"
 
-# Cabecera con logo
+# Cabecera
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
     mostrar_logo_cabecera()
 
 if st.session_state["dni_activo"] is None:
-    st.markdown("<h1 style='text-align: center; color: white; margin-top: -10px;'>STVP Digital</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; color: white;'>STVP Digital</h1>", unsafe_allow_html=True)
     st.markdown("### Acceso Afiliados")
-    dni_input = st.text_input("Ingrese su DNI:")
+    dni_input = st.text_input("Ingrese su DNI (sin puntos):")
+    
     if st.button("Validar"):
-        dni_clean = str(dni_input).strip()
-        if not db_socios.empty and dni_clean in db_socios['dni'].astype(str).values:
+        # Normalizar la entrada del usuario para comparar
+        dni_clean = str(dni_input).replace(".", "").replace(" ", "").strip()
+        if not db_socios.empty and dni_clean in db_socios['dni'].values:
             st.session_state["dni_activo"] = dni_clean
             st.rerun()
         else:
-            st.error("DNI no encontrado.")
+            st.error("DNI no encontrado o error de conexión.")
 else:
-    # Obtener datos del socio logueado
-    socio = db_socios[db_socios['dni'].astype(str) == st.session_state["dni_activo"]].iloc[0]
+    # Datos del socio
+    socio = db_socios[db_socios['dni'] == st.session_state["dni_activo"]].iloc[0]
     
-    # Menú de Botones
+    # Menú de Navegación
     m1, m2, m3, m4 = st.columns(4)
     with m1:
         if st.button("🪪 Inicio"): st.session_state["seccion"] = "credencial"; st.rerun()
@@ -162,40 +176,39 @@ else:
     with m3:
         if st.button("⚖️ Legal"): st.session_state["seccion"] = "legal"; st.rerun()
     with m4:
-        if st.button("🎁 Beneficios"): st.session_state["seccion"] = "beneficios"; st.rerun()
+        if st.button("🎁 Benef."): st.session_state["seccion"] = "beneficios"; st.rerun()
 
     st.markdown("---")
 
+    # SECCIONES
     if st.session_state["seccion"] == "credencial":
         cargo_raw = str(socio.get('cargo', 'AFILIADO')).upper()
         
-        # --- LÓGICA DE COLORES POR JERARQUÍA ---
-        if any(x in cargo_raw for x in ["COMISIÓN", "DIRECTIVA", "SECRETARIO", "SEC."]):
-            bg_color = "linear-gradient(135deg, #854d0e 0%, #422006 100%)" # Dorado/Marrón
-            border_color = "#fbbf24" # Amarillo/Oro
+        # Lógica de colores (Mejora 2)
+        if any(x in cargo_raw for x in ["COMISIÓN", "DIRECTIVA", "SECRETARIO"]):
+            bg_color = "linear-gradient(135deg, #854d0e 0%, #422006 100%)"
+            border_color = "#fbbf24"
             label_text = "COMISIÓN DIRECTIVA"
         elif "DELEGADO" in cargo_raw:
-            bg_color = "linear-gradient(135deg, #064e3b 0%, #022c22 100%)" # Verde oscuro
-            border_color = "#4ade80" # Verde neón
+            bg_color = "linear-gradient(135deg, #064e3b 0%, #022c22 100%)"
+            border_color = "#4ade80"
             label_text = "DELEGADO"
         else:
-            bg_color = "linear-gradient(135deg, #1e3a8a 0%, #172554 100%)" # Azul profundo
-            border_color = "#3b82f6" # Azul claro
+            bg_color = "linear-gradient(135deg, #1e3a8a 0%, #172554 100%)"
+            border_color = "#3b82f6"
             label_text = "AFILIADO"
 
-        # Marca de agua base64
         logo_b64 = get_image_base64("logo_stvp")
         watermark_html = f'<img src="{logo_b64}" class="watermark">' if logo_b64 else ''
 
-        # Credencial Visual
         st.markdown(f"""
             <div class="credential-card" style="background: {bg_color}; border: 2px solid {border_color};">
                 {watermark_html}
                 <div class="card-content">
                     <p style="text-align: left; font-size: 0.7em; letter-spacing: 2px; opacity: 0.7; margin: 0;">SINDICATO STVP</p>
                     <div style="height: 30px;"></div>
-                    <h2 style="margin: 0; font-size: 1.8em; text-transform: uppercase; color: white;">{socio['nombre']}</h2>
-                    <div style="background: rgba(0,0,0,0.4); padding: 5px 15px; border-radius: 50px; display: inline-block; margin-top: 15px; color: {border_color}; font-weight: bold; font-size: 0.8em; border: 1px solid {border_color};">
+                    <h2 style="margin: 0; font-size: 1.8em; text-transform: uppercase;">{socio['nombre']}</h2>
+                    <div style="background: rgba(0,0,0,0.4); padding: 5px 15px; border-radius: 50px; display: inline-block; margin-top: 15px; color: {border_color}; font-weight: bold; border: 1px solid {border_color};">
                         {label_text}
                     </div>
                     <div style="display: flex; justify-content: space-between; margin-top: 40px; font-size: 0.9em;">
@@ -207,7 +220,7 @@ else:
         """, unsafe_allow_html=True)
 
         # Familiares
-        fams = db_familia[db_familia['dni_titular'].astype(str) == st.session_state["dni_activo"]]
+        fams = db_familia[db_familia['dni_titular'] == st.session_state["dni_activo"]]
         if not fams.empty:
             st.subheader("👨‍👩‍👧‍👦 Grupo Familiar")
             for _, f in fams.iterrows():
@@ -219,50 +232,26 @@ else:
                 """, unsafe_allow_html=True)
 
     elif st.session_state["seccion"] in ["gremial", "legal"]:
-        titulo = "Consulta Gremial" if st.session_state["seccion"] == "gremial" else "Asesoría Legal"
-        st.subheader(titulo)
-        st.info("Su consulta será derivada directamente a nuestros secretarios vía WhatsApp.")
-        detalle = st.text_area("Describa su inquietud:")
-        if st.button("Enviar por WhatsApp"):
-            mensaje = f"Hola STVP, soy {socio['nombre']} (DNI {socio['dni']}). Mi consulta {st.session_state['seccion']} es: {detalle}"
+        st.subheader("Consultas")
+        st.info("Su mensaje será enviado a un secretario.")
+        detalle = st.text_area("Escriba su consulta:")
+        if st.button("Enviar WhatsApp"):
+            mensaje = f"Hola, soy {socio['nombre']} (DNI {socio['dni']}). Consulta: {detalle}"
             url_wa = f"https://wa.me/5491156424903?text={urllib.parse.quote(mensaje)}"
             st.markdown(f'<a href="{url_wa}" target="_blank" style="text-decoration:none;"><div style="background:#25D366; color:white; padding:15px; border-radius:12px; text-align:center; font-weight:bold;">📲 Abrir WhatsApp</div></a>', unsafe_allow_html=True)
 
-    elif st.session_state["seccion"] == "beneficios":
-        st.subheader("🎁 Beneficios Exclusivos")
-        items = [
-            ("🏨 Turismo - Rolsolviajes", "Hotelería propia y convenios en todo el país. Acceda a las ofertas vigentes.", "https://whatsapp.com/channel/0029VbAua9BJENy8oScpAH2B"),
-            ("📚 Útiles", "Entrega de kits escolares anuales.", None),
-            ("🎁 Nacimiento", "Ajuar para el recién nacido.", None)
-        ]
-        for t, d, link in items:
-            if link:
-                st.markdown(f"""
-                    <a href="{link}" target="_blank" class="link-benefit">
-                        <div class="benefit-item">
-                            <div style="font-weight: bold; color: #3b82f6;">{t} 🔗</div>
-                            <div style="font-size: 0.85em; color: #94a3b8;">{d} <br> <span style="color:#25D366; font-size:0.9em;">(Ver canal de WhatsApp)</span></div>
-                        </div>
-                    </a>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown(f"""
-                    <div class="benefit-item">
-                        <div style="font-weight: bold; color: #3b82f6;">{t}</div>
-                        <div style="font-size: 0.85em; color: #94a3b8;">{d}</div>
-                    </div>
-                """, unsafe_allow_html=True)
-
-    if st.sidebar.button("❌ Cerrar Sesión"):
+    # Mejora 4: Botón de cierre de sesión visible al final
+    st.markdown('<div class="logout-btn">', unsafe_allow_html=True)
+    if st.button("❌ Cerrar Sesión"):
         st.session_state["dni_activo"] = None
-        st.session_state["seccion"] = "credencial"
         st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # Sidebar Admin
 with st.sidebar:
-    st.markdown("---")
-    if st.checkbox("Admin"):
+    st.title("Administración")
+    if st.checkbox("Acceso Admin"):
         if st.text_input("Clave", type="password") == "stvp2025":
-            if st.button("Actualizar Padrón"):
+            if st.button("Forzar Sincronización"):
                 st.cache_data.clear()
-                st.success("Datos sincronizados.")
+                st.success("Datos actualizados.")
