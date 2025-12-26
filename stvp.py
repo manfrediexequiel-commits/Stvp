@@ -34,13 +34,6 @@ st.markdown("""
         background-color: #1d4ed8;
     }
 
-    /* Estilo para los botones de navegación */
-    .nav-button>button {
-        background-color: #1e293b;
-        border: 1px solid #3b82f6;
-        color: #3b82f6;
-    }
-
     .credential-card {
         border-radius: 20px;
         padding: 30px;
@@ -174,12 +167,21 @@ else:
     st.markdown("---")
 
     if st.session_state["seccion"] == "credencial":
-        cargo = str(socio.get('cargo', 'AFILIADO')).upper()
+        cargo_raw = str(socio.get('cargo', 'AFILIADO')).upper()
         
-        # Colores según cargo
-        es_directiva = any(x in cargo for x in ["COMISIÓN", "DIRECTIVA", "SEC."])
-        bg_color = "linear-gradient(135deg, #854d0e 0%, #422006 100%)" if es_directiva else "linear-gradient(135deg, #1e3a8a 0%, #172554 100%)"
-        border_color = "#fbbf24" if es_directiva else "#3b82f6"
+        # --- LÓGICA DE COLORES POR JERARQUÍA ---
+        if any(x in cargo_raw for x in ["COMISIÓN", "DIRECTIVA", "SECRETARIO", "SEC."]):
+            bg_color = "linear-gradient(135deg, #854d0e 0%, #422006 100%)" # Dorado/Marrón
+            border_color = "#fbbf24" # Amarillo/Oro
+            label_text = "COMISIÓN DIRECTIVA"
+        elif "DELEGADO" in cargo_raw:
+            bg_color = "linear-gradient(135deg, #064e3b 0%, #022c22 100%)" # Verde oscuro
+            border_color = "#4ade80" # Verde neón
+            label_text = "DELEGADO"
+        else:
+            bg_color = "linear-gradient(135deg, #1e3a8a 0%, #172554 100%)" # Azul profundo
+            border_color = "#3b82f6" # Azul claro
+            label_text = "AFILIADO"
 
         # Marca de agua base64
         logo_b64 = get_image_base64("logo_stvp")
@@ -194,7 +196,7 @@ else:
                     <div style="height: 30px;"></div>
                     <h2 style="margin: 0; font-size: 1.8em; text-transform: uppercase; color: white;">{socio['nombre']}</h2>
                     <div style="background: rgba(0,0,0,0.4); padding: 5px 15px; border-radius: 50px; display: inline-block; margin-top: 15px; color: {border_color}; font-weight: bold; font-size: 0.8em; border: 1px solid {border_color};">
-                        {cargo}
+                        {label_text}
                     </div>
                     <div style="display: flex; justify-content: space-between; margin-top: 40px; font-size: 0.9em;">
                         <div style="text-align: left;">DNI<br><b>{socio['dni']}</b></div>
@@ -228,14 +230,11 @@ else:
 
     elif st.session_state["seccion"] == "beneficios":
         st.subheader("🎁 Beneficios Exclusivos")
-        
-        # Lista de beneficios actualizada
         items = [
             ("🏨 Turismo - Rolsolviajes", "Hotelería propia y convenios en todo el país. Acceda a las ofertas vigentes.", "https://whatsapp.com/channel/0029VbAua9BJENy8oScpAH2B"),
             ("📚 Útiles", "Entrega de kits escolares anuales.", None),
             ("🎁 Nacimiento", "Ajuar para el recién nacido.", None)
         ]
-        
         for t, d, link in items:
             if link:
                 st.markdown(f"""
