@@ -1,5 +1,5 @@
 import streamlit as st
-import pandas as pd
+import pd
 import requests
 from io import StringIO
 import os
@@ -141,6 +141,7 @@ def cargar_datos_reales():
     try:
         res_s = requests.get(URL_SOCIOS)
         res_f = requests.get(URL_FAMILIA)
+        import pandas as pd
         df_s = pd.read_csv(StringIO(res_s.text))
         df_f = pd.read_csv(StringIO(res_f.text))
         # Normalizar nombres de columnas a minúsculas
@@ -149,6 +150,7 @@ def cargar_datos_reales():
         return df_s, df_f
     except Exception as e:
         st.error(f"Error conectando con la base de datos: {e}")
+        import pandas as pd
         return pd.DataFrame(), pd.DataFrame()
 
 def get_style(cargo):
@@ -252,7 +254,7 @@ else:
             st.subheader("👨‍👩‍👧‍👦 Grupo Familiar")
             for _, f in fams.iterrows():
                 f_img = format_drive_url(f.get('foto', ''))
-                f_tag = f'<img src="{f_img}" class="family-img">' if pd.notna(f_img) else '<div class="family-img" style="background:#475569; display:flex; align-items:center; justify-content:center;">👤</div>'
+                f_tag = f'<img src="{f_img}" class="family-img">' if f_img and str(f_img) != 'nan' else '<div class="family-img" style="background:#475569; display:flex; align-items:center; justify-content:center;">👤</div>'
                 st.markdown(f"""
                     <div class="family-card">
                         {f_tag}
