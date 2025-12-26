@@ -229,13 +229,11 @@ else:
     elif st.session_state["seccion"] == "beneficios":
         st.subheader("🎁 Beneficios Exclusivos")
         
-        # Lista de beneficios con links opcionales
+        # Lista de beneficios actualizada
         items = [
             ("🏨 Turismo - Rolsolviajes", "Hotelería propia y convenios en todo el país. Acceda a las ofertas vigentes.", "https://whatsapp.com/channel/0029VbAua9BJENy8oScpAH2B"),
-            ("💊 Farmacias", "Descuentos adicionales en red de farmacias.", None),
             ("📚 Útiles", "Entrega de kits escolares anuales.", None),
-            ("🎁 Nacimiento", "Ajuar para el recién nacido.", None),
-            ("⚖️ Asesoría", "Consultas legales gratuitas para afiliados.", None)
+            ("🎁 Nacimiento", "Ajuar para el recién nacido.", None)
         ]
         
         for t, d, link in items:
