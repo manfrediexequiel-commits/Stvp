@@ -4,7 +4,6 @@ import requests
 from io import StringIO
 import os
 import base64
-import urllib.parse
 import re
 
 # --- CONFIGURACIÓN DE PÁGINA ---
@@ -20,6 +19,7 @@ st.markdown("""
     .main {
         background-color: #0f172a;
     }
+    
     .stButton>button {
         width: 100%;
         border-radius: 12px;
@@ -29,9 +29,10 @@ st.markdown("""
         font-weight: bold;
         border: none;
     }
+
     .credential-card {
         border-radius: 20px;
-        padding: 25px;
+        padding: 30px;
         margin-bottom: 20px;
         color: white;
         box-shadow: 0 10px 25px rgba(0,0,0,0.5);
@@ -39,26 +40,51 @@ st.markdown("""
         position: relative;
         overflow: hidden;
     }
-    .profile-img {
-        width: 110px;
-        height: 110px;
-        border-radius: 50%;
-        object-fit: cover;
-        border: 3px solid white;
-        margin-bottom: 10px;
+
+    .watermark {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) rotate(-15deg);
+        width: 180px;
+        opacity: 0.12;
+        pointer-events: none;
+        z-index: 0;
     }
+
+    .card-content {
+        position: relative;
+        z-index: 10;
+        text-align: center;
+    }
+    
     .family-card {
         background-color: #1e293b;
         border-radius: 15px;
         padding: 15px;
         margin-bottom: 10px;
         border-left: 5px solid #3b82f6;
-        display: flex;
-        align-items: center;
-        gap: 15px;
     }
     </style>
 """, unsafe_allow_html=True)
+
+# --- UTILIDADES PARA IMÁGENES ---
+def get_image_base64(path_no_ext):
+    """Convierte una imagen local a Base64 para usar en HTML."""
+    posibles_ext = ['png', 'jpg', 'jpeg', 'webp']
+    for ext in posibles_ext:
+        full_path = f"{path_no_ext}.{ext}"
+        if os.path.exists(full_path):
+            with open(full_path, "rb") as img_file:
+                return f"data:image/{ext};base64," + base64.b64encode(img_file.read()).decode()
+    return None
+
+def mostrar_logo_cabecera():
+    b64 = get_image_base64("logo_stvp")
+    if b64:
+        st.image(b64, width=120)
+    else:
+        st.markdown('<div style="text-align:center"><h2 style="color:#2563eb">STVP</h2></div>', unsafe_allow_html=True)
 
 # --- CARGA DE DATOS ---
 URL_SOCIOS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRT80rJKxr62o2RBs5PpaCvpWbyH2B14dk1Gv610WH3QPoeQi2akdeu4Kgo97Mtq-QOmB8d3ORap8-n/pub?gid=0&single=true&output=csv"
@@ -77,45 +103,82 @@ def cargar_datos():
     except:
         return pd.DataFrame(), pd.DataFrame()
 
-# --- LÓGICA PRINCIPAL ---
+# --- LÓGICA DE LA APP ---
 db_socios, db_familia = cargar_datos()
 
 if "dni_activo" not in st.session_state:
     st.session_state["dni_activo"] = None
 
+# Cabecera con logo
+col1, col2, col3 = st.columns([1, 2, 1])
+with col2:
+    mostrar_logo_cabecera()
+
+st.markdown("<h1 style='text-align: center; color: white; margin-top: -10px;'>STVP Digital</h1>", unsafe_allow_html=True)
+
 if st.session_state["dni_activo"] is None:
-    st.title("🛡️ Credencial STVP")
-    dni_in = st.text_input("Ingrese su DNI para acceder:")
-    if st.button("Validar Afiliado"):
-        dni_str = str(dni_in).strip()
-        if not db_socios.empty and dni_str in db_socios['dni'].astype(str).values:
-            st.session_state["dni_activo"] = dni_str
+    st.markdown("### Acceso Afiliados")
+    dni_input = st.text_input("Ingrese su DNI:")
+    if st.button("Validar"):
+        dni_clean = str(dni_input).strip()
+        if not db_socios.empty and dni_clean in db_socios['dni'].astype(str).values:
+            st.session_state["dni_activo"] = dni_clean
             st.rerun()
         else:
             st.error("DNI no encontrado.")
 else:
+    # Datos del socio
     socio = db_socios[db_socios['dni'].astype(str) == st.session_state["dni_activo"]].iloc[0]
+    cargo = str(socio.get('cargo', 'AFILIADO')).upper()
     
-    # Renderizado de Credencial
+    # Colores según cargo
+    es_directiva = any(x in cargo for x in ["COMISIÓN", "DIRECTIVA", "SEC."])
+    bg_color = "linear-gradient(135deg, #854d0e 0%, #422006 100%)" if es_directiva else "linear-gradient(135deg, #1e3a8a 0%, #172554 100%)"
+    border_color = "#fbbf24" if es_directiva else "#3b82f6"
+
+    # Marca de agua base64
+    logo_b64 = get_image_base64("logo_stvp")
+    watermark_html = f'<img src="{logo_b64}" class="watermark">' if logo_b64 else ''
+
+    # Credencial Visual con Marca de Agua
     st.markdown(f"""
-        <div class="credential-card" style="background: linear-gradient(135deg, #1e3a8a 0%, #172554 100%); border: 2px solid #3b82f6;">
-            <div style="text-align: center;">
-                <h2 style="margin: 0; color: white;">{socio['nombre']}</h2>
-                <div style="color: #3b82f6; font-weight: bold; margin-bottom: 15px;">{socio.get('cargo', 'AFILIADO')}</div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.8em; opacity: 0.8;">
-                    <div>DNI: {socio['dni']}</div>
-                    <div style="color: #4ade80;">ESTADO: ACTIVO</div>
+        <div class="credential-card" style="background: {bg_color}; border: 2px solid {border_color};">
+            {watermark_html}
+            <div class="card-content">
+                <p style="text-align: left; font-size: 0.7em; letter-spacing: 2px; opacity: 0.7; margin: 0;">SINDICATO STVP</p>
+                <div style="height: 30px;"></div>
+                <h2 style="margin: 0; font-size: 1.8em; text-transform: uppercase; color: white;">{socio['nombre']}</h2>
+                <div style="background: rgba(0,0,0,0.4); padding: 5px 15px; border-radius: 50px; display: inline-block; margin-top: 15px; color: {border_color}; font-weight: bold; font-size: 0.8em; border: 1px solid {border_color};">
+                    {cargo}
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-top: 40px; font-size: 0.9em;">
+                    <div style="text-align: left;">DNI<br><b>{socio['dni']}</b></div>
+                    <div style="text-align: right;">ESTADO<br><b style="color: #4ade80;">ACTIVO</b></div>
                 </div>
             </div>
         </div>
     """, unsafe_allow_html=True)
 
-    if st.button("Cerrar Sesión"):
+    # Familiares
+    fams = db_familia[db_familia['dni_titular'].astype(str) == st.session_state["dni_activo"]]
+    if not fams.empty:
+        st.subheader("👨‍👩‍👧‍👦 Grupo Familiar")
+        for _, f in fams.iterrows():
+            st.markdown(f"""
+                <div class="family-card">
+                    <div style="font-weight: bold; color: white;">{f['nombre']}</div>
+                    <div style="font-size: 0.8em; color: #94a3b8;">{f.get('parentesco', 'Familiar')} • DNI: {f.get('dni_familiar', 'N/A')}</div>
+                </div>
+            """, unsafe_allow_html=True)
+
+    if st.button("❌ Cerrar Sesión"):
         st.session_state["dni_activo"] = None
         st.rerun()
 
-    # Familiares
-    st.subheader("Grupo Familiar")
-    fams = db_familia[db_familia['dni_titular'].astype(str) == st.session_state["dni_activo"]]
-    for _, f in fams.iterrows():
-        st.info(f"**{f['nombre']}** - {f.get('parentesco', 'Familiar')}")
+# Sidebar Admin
+with st.sidebar:
+    if st.checkbox("Admin"):
+        if st.text_input("Clave", type="password") == "stvp2025":
+            if st.button("Actualizar Padrón"):
+                st.cache_data.clear()
+                st.success("Datos sincronizados.")
