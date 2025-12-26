@@ -5,6 +5,7 @@ from io import StringIO
 import os
 import base64
 import urllib.parse
+from PIL import Image
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="STVP - Credencial Digital", page_icon="🛡️", layout="centered")
@@ -15,43 +16,20 @@ st.markdown("""
     <style>
     .main { background-color: #0f172a; }
     
-    /* Estilo de la Foto en la Credencial */
     .photo-container {
-        width: 100px;
-        height: 100px;
-        border-radius: 50%;
-        border: 3px solid rgba(255,255,255,0.8);
-        overflow: hidden;
-        margin-right: 20px;
-        background-color: #334155;
-        flex-shrink: 0;
+        width: 100px; height: 100px; border-radius: 50%;
+        border: 3px solid rgba(255,255,255,0.8); overflow: hidden;
+        margin-right: 20px; background-color: #334155; flex-shrink: 0;
     }
-    .photo-container img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
+    .photo-container img { width: 100%; height: 100%; object-fit: cover; }
 
     .credential-card {
-        border-radius: 20px;
-        padding: 25px;
-        margin-bottom: 20px;
-        color: white;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-        position: relative;
-        overflow: hidden;
-        display: flex;
-        flex-direction: column;
+        border-radius: 20px; padding: 25px; margin-bottom: 20px;
+        color: white; box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        position: relative; overflow: hidden; display: flex; flex-direction: column;
     }
 
-    .card-header {
-        display: flex;
-        align-items: center;
-        text-align: left;
-        margin-top: 15px;
-        position: relative;
-        z-index: 10;
-    }
+    .card-header { display: flex; align-items: center; text-align: left; margin-top: 15px; position: relative; z-index: 10; }
 
     .download-btn {
         background: #059669; color: white; padding: 12px; border-radius: 12px;
@@ -59,9 +37,9 @@ st.markdown("""
         border: none; width: 100%;
     }
 
-    .family-card {
-        background-color: #ffffff; border-radius: 12px; padding: 15px;
-        margin-bottom: 12px; border-left: 8px solid #3b82f6;
+    .admin-box {
+        background-color: #1e293b; border: 1px dashed #3b82f6;
+        padding: 20px; border-radius: 15px; margin-top: 20px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -94,15 +72,14 @@ if st.session_state["dni_activo"] is None:
             st.rerun()
 else:
     socio = db_socios[db_socios['dni'] == st.session_state["dni_activo"]].iloc[0]
-    
-    # Manejo de la URL de la foto
-    # Si no hay columna 'foto' o está vacía, usamos un placeholder
+    cargo = str(socio.get('cargo', 'AFILIADO')).upper()
+    es_admin = any(x in cargo for x in ["DELEGADO", "COMISIÓN", "DIRECTIVA"])
+
+    # --- RENDER DE CREDENCIAL ---
     url_foto = socio.get('foto', 'https://www.w3schools.com/howto/img_avatar.png')
     if pd.isna(url_foto) or str(url_foto).strip() == "":
         url_foto = "https://www.w3schools.com/howto/img_avatar.png"
 
-    # Lógica de colores según cargo
-    cargo = str(socio.get('cargo', 'AFILIADO')).upper()
     if any(x in cargo for x in ["COMISIÓN", "DIRECTIVA"]):
         bg, border, label = "linear-gradient(135deg, #854d0e 0%, #422006 100%)", "#fbbf24", "COMISIÓN DIRECTIVA"
     elif "DELEGADO" in cargo:
@@ -110,33 +87,25 @@ else:
     else:
         bg, border, label = "linear-gradient(135deg, #1e3a8a 0%, #172554 100%)", "#3b82f6", "AFILIADO"
 
-    # HTML de la Credencial con Foto
     st.markdown(f"""
         <div id="digital-credential" class="credential-card" style="background: {bg}; border: 2px solid {border};">
-            <p style="font-size: 0.7em; letter-spacing: 2px; opacity: 0.8; margin: 0;">SINDICATO STVP</p>
-            
             <div class="card-header">
-                <div class="photo-container">
-                    <img src="{url_foto}" alt="Foto Afiliado">
-                </div>
+                <div class="photo-container"><img src="{url_foto}"></div>
                 <div>
-                    <h2 style="margin: 0; font-size: 1.5em; line-height: 1.1;">{socio['nombre']}</h2>
-                    <div style="background: rgba(0,0,0,0.4); padding: 3px 10px; border-radius: 50px; display: inline-block; margin-top: 8px; color: {border}; font-weight: bold; font-size: 0.75em; border: 1px solid {border};">
-                        {label}
-                    </div>
+                    <h2 style="margin: 0; font-size: 1.5em;">{socio['nombre']}</h2>
+                    <div style="background: rgba(0,0,0,0.4); padding: 3px 10px; border-radius: 50px; color: {border}; font-weight: bold; font-size: 0.75em; border: 1px solid {border};">{label}</div>
                 </div>
             </div>
-
-            <div style="display: flex; justify-content: space-between; margin-top: 30px; font-size: 0.9em; position: relative; z-index: 10;">
-                <div style="text-align: left;">DNI<br><b>{socio['dni']}</b></div>
+            <div style="display: flex; justify-content: space-between; margin-top: 30px; font-size: 0.9em;">
+                <div>DNI<br><b>{socio['dni']}</b></div>
                 <div style="text-align: right;">ESTADO<br><b style="color: #4ade80;">ACTIVO</b></div>
             </div>
         </div>
-        
+        <button class="download-btn" onclick="downloadCredential()">⬇️ GUARDAR CREDENCIAL</button>
         <script>
         function downloadCredential() {{
             const element = document.getElementById('digital-credential');
-            html2canvas(element, {{ scale: 2, backgroundColor: null }}).then(canvas => {{
+            html2canvas(element, {{ scale: 2 }}).then(canvas => {{
                 const link = document.createElement('a');
                 link.download = 'Credencial_{socio['dni']}.png';
                 link.href = canvas.toDataURL('image/png');
@@ -144,20 +113,26 @@ else:
             }});
         }}
         </script>
-        <button class="download-btn" onclick="downloadCredential()">⬇️ GUARDAR COMO IMAGEN</button>
     """, unsafe_allow_html=True)
 
-    # Mostrar Familiares (mismo código anterior)
-    fams = db_familia[db_familia['dni_titular'] == st.session_state["dni_activo"]]
-    if not fams.empty:
-        st.markdown("<h3 style='color: white;'>👨‍👩‍👧‍👦 Grupo Familiar</h3>", unsafe_allow_html=True)
-        for _, f in fams.iterrows():
-            st.markdown(f"""
-                <div class="family-card">
-                    <div style="color: #1e293b; font-weight: 800; text-transform: uppercase;">{f['nombre']}</div>
-                    <div style="color: #475569; font-size: 0.9em;">DNI: {f.get('dni_familiar', 'N/A')}</div>
-                </div>
-            """, unsafe_allow_html=True)
+    # --- SECCIÓN PARA DELEGADOS: CARGA DE FOTO ---
+    if es_admin:
+        st.markdown("---")
+        st.subheader("📸 Panel de Delegado")
+        with st.expander("Actualizar Foto de Afiliado"):
+            st.write("Suba la foto para previsualizar cómo quedaría la credencial.")
+            archivo_foto = st.file_uploader("Seleccione imagen (JPG/PNG)", type=['jpg', 'png', 'jpeg'])
+            
+            if archivo_foto:
+                img = Image.open(archivo_foto)
+                st.image(img, width=150, caption="Previsualización")
+                st.warning("⚠️ Para que el cambio sea permanente, envíe esta foto al administrador.")
+                
+                # Botón de envío rápido
+                if st.button("Enviar foto por WhatsApp"):
+                    msg = f"Hola, soy el delegado {socio['nombre']}. Solicito actualizar la foto del DNI {socio['dni']}."
+                    url_wa = f"https://wa.me/5491156424903?text={urllib.parse.quote(msg)}"
+                    st.markdown(f'<a href="{url_wa}" target="_blank" style="text-decoration:none;"><div style="background:#25D366; color:white; padding:10px; border-radius:10px; text-align:center;">📲 Enviar a Sistemas</div></a>', unsafe_allow_html=True)
 
     if st.button("❌ Salir"):
         st.session_state["dni_activo"] = None
