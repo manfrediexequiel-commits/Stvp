@@ -107,6 +107,7 @@ def format_drive_url(url):
     """Convierte enlaces de Google Drive en enlaces directos de imagen."""
     if not isinstance(url, str) or pd.isna(url) or url.strip() == "":
         return None
+    # Intenta capturar el ID del archivo de un link de drive
     drive_match = re.search(r"(?:https?://)?(?:drive\.google\.com/(?:file/d/|open\?id=)|googledrive\.com/host/)([\w-]+)", url)
     if drive_match:
         file_id = drive_match.group(1)
@@ -141,6 +142,7 @@ def cargar_datos_reales():
         res_f = requests.get(URL_FAMILIA)
         df_s = pd.read_csv(StringIO(res_s.text))
         df_f = pd.read_csv(StringIO(res_f.text))
+        # Normalización de columnas
         df_s.columns = df_s.columns.str.strip().str.lower()
         df_f.columns = df_f.columns.str.strip().str.lower()
         return df_s, df_f
@@ -150,7 +152,7 @@ def cargar_datos_reales():
 
 def get_style(cargo):
     c = str(cargo).upper()
-    if "COMISIÓN" in c or "DIRECTIVA" in c: 
+    if any(x in c for x in ["COMISIÓN", "DIRECTIVA", "SECRETARIO", "SEC."]): 
         return "linear-gradient(135deg, #854d0e 0%, #422006 100%)", "#fbbf24"
     if "DELEGADO" in c:
         return "linear-gradient(135deg, #065f46 0%, #064e3b 100%)", "#6ee7b7"
@@ -177,19 +179,19 @@ if st.session_state["dni_activo"] is None:
     if st.button("Consultar Padrón"):
         if dni_in:
             if not db_socios.empty:
-                # Asegurar que comparamos strings
-                socio_filt = db_socios[db_socios['dni'].astype(str).str.strip() == str(dni_in).strip()]
+                dni_str = str(dni_in).strip()
+                socio_filt = db_socios[db_socios['dni'].astype(str).str.strip() == dni_str]
                 if not socio_filt.empty:
-                    st.session_state["dni_activo"] = str(dni_in).strip()
+                    st.session_state["dni_activo"] = dni_str
                     st.rerun()
                 else:
-                    st.error("DNI no encontrado.")
+                    st.error("DNI no encontrado en el padrón actual.")
             else:
                 st.error("Error al acceder a la base de datos.")
         else:
-            st.warning("Ingrese un DNI.")
+            st.warning("Por favor, ingrese un número de DNI.")
 else:
-    # Menú
+    # Menú de Navegación
     m1, m2, m3, m4 = st.columns(4)
     with m1: 
         if st.button("🪪 Credencial"): st.session_state["pantalla"] = "inicio"; st.rerun()
@@ -200,25 +202,27 @@ else:
     with m4: 
         if st.button("🎁 Beneficios"): st.session_state["pantalla"] = "bonos"; st.rerun()
 
-    # Obtener datos del socio activo
+    # Obtención de datos segura
     try:
         socio_data = db_socios[db_socios['dni'].astype(str).str.strip() == str(st.session_state["dni_activo"])].iloc[0]
-    except Exception:
+    except:
         st.session_state["dni_activo"] = None
         st.rerun()
 
     if st.session_state["pantalla"] == "inicio":
-        # Lógica de colores y estilos
+        # Estilos basados en cargo
         cargo_actual = socio_data.get('cargo', socio_data.get('miembro', 'AFILIADO'))
         bg, brd = get_style(cargo_actual)
         
-        # Imagen y Marca de Agua
-        logo_b64 = get_image_base64("logo_stvp")
-        watermark_html = f'<img src="{logo_b64}" class="watermark">' if logo_b64 else ''
-        
+        # Procesamiento de Foto
         foto_url = format_drive_url(socio_data.get('foto'))
         foto_html = f'<img src="{foto_url}" class="profile-img">' if foto_url else '<div style="height:20px"></div>'
         
+        # Marca de agua
+        logo_b64 = get_image_base64("logo_stvp")
+        watermark_html = f'<img src="{logo_b64}" class="watermark">' if logo_b64 else ''
+        
+        # RENDERIZADO DE CREDENCIAL SEGÚN EL DISEÑO SOLICITADO
         st.markdown(f"""
             <div class="credential-card" style="background: {bg}; border: 2px solid {brd};">
                 {watermark_html}
@@ -230,7 +234,9 @@ else:
                     
                     <div style="text-align: center; margin: 15px 0;">
                         {foto_html}
-                        <h2 style="margin: 5px 0 0 0; font-size: 1.6em; text-transform: uppercase; color: white; text-shadow: 1px 1px 4px rgba(0,0,0,0.5);">{socio_data['nombre']}</h2>
+                        <h2 style="margin: 5px 0 0 0; font-size: 1.6em; text-transform: uppercase; color: white; text-shadow: 1px 1px 4px rgba(0,0,0,0.5);">
+                            {socio_data['nombre']}
+                        </h2>
                         <div style="margin-top: 5px; display: inline-block; background: rgba(0,0,0,0.5); padding: 4px 12px; border-radius: 50px; font-size: 0.75em; font-weight: bold; color: {brd}; border: 1px solid {brd};">
                             {cargo_actual}
                         </div>
@@ -256,7 +262,7 @@ else:
             st.subheader("👨‍👩‍👧‍👦 Grupo Familiar")
             for _, f in fams.iterrows():
                 f_url = format_drive_url(f.get('foto'))
-                f_tag = f'<img src="{f_url}" class="family-img">' if f_url else '<div class="family-img" style="background:#475569; display:flex; align-items:center; justify-content:center;">👤</div>'
+                f_tag = f'<img src="{f_url}" class="family-img">' if f_url else '<div class="family-img" style="background:#475569; display:flex; align-items:center; justify-content:center; color:white; font-size:20px;">👤</div>'
                 st.markdown(f"""
                     <div class="family-card">
                         {f_tag}
@@ -267,21 +273,25 @@ else:
                     </div>
                 """, unsafe_allow_html=True)
         else:
-            st.info("No hay familiares vinculados.")
+            st.info("No hay familiares vinculados en el padrón.")
 
     elif st.session_state["pantalla"] == "bonos":
         st.subheader("🎁 Beneficios")
-        beneficios = [("🏨", "Turismo", "Hoteles con convenio."), ("💊", "Salud", "Farmacias."), ("📚", "Educación", "Útiles escolares.")]
+        beneficios = [
+            ("🏨", "Turismo", "Hoteles con convenio."),
+            ("💊", "Salud", "Farmacias adheridas."),
+            ("📚", "Educación", "Kits escolares.")
+        ]
         for icon, title, desc in beneficios:
             st.markdown(f'<div class="benefit-card"><h3>{icon} {title}</h3><p>{desc}</p></div>', unsafe_allow_html=True)
 
     elif st.session_state["pantalla"] in ["gremial", "legal"]:
         tipo = st.session_state["pantalla"].upper()
         st.subheader(f"Consulta {tipo}")
-        msg = st.text_area("Escriba su consulta:")
-        if st.button("Enviar WhatsApp"):
-            text = urllib.parse.quote(f"Consulta {tipo}\nSocio: {socio_data['nombre']}\nDNI: {socio_data['dni']}\nMsg: {msg}")
-            st.markdown(f'<a href="https://wa.me/5491156424903?text={text}" target="_blank" style="display:block; background:#25D366; color:white; text-align:center; padding:10px; border-radius:10px; text-decoration:none;">📲 Abrir WhatsApp</a>', unsafe_allow_html=True)
+        msg = st.text_area("Escriba su consulta aquí:")
+        if st.button("Enviar por WhatsApp"):
+            msg_quote = urllib.parse.quote(f"Consulta {tipo}\nAfiliado: {socio_data['nombre']}\nDNI: {socio_data['dni']}\nConsulta: {msg}")
+            st.markdown(f'<a href="https://wa.me/5491156424903?text={msg_quote}" target="_blank" style="display:block; background:#25D366; color:white; text-align:center; padding:10px; border-radius:10px; text-decoration:none; font-weight:bold;">📲 Enviar Mensaje</a>', unsafe_allow_html=True)
 
     if st.sidebar.button("❌ Cerrar Sesión"):
         st.session_state["dni_activo"] = None
@@ -289,8 +299,10 @@ else:
 
 with st.sidebar:
     st.markdown("### ⚙️ Administración")
-    if st.checkbox("Modo Admin"):
-        if st.text_input("Clave:", type="password") == "stvp2025":
-            if st.button("🔄 Refrescar Datos"):
+    if st.checkbox("Modo Administrador"):
+        pwd = st.text_input("Clave:", type="password")
+        if pwd == "stvp2025":
+            if st.button("🔄 Refrescar Padrón"):
                 st.cache_data.clear()
+                st.success("Base de datos actualizada.")
                 st.rerun()
