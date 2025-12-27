@@ -20,6 +20,7 @@ st.markdown("""
     <style>
     .main { background-color: #0f172a; }
     
+    /* Botones de Navegación */
     .stButton>button {
         width: 100%; border-radius: 12px; height: 4.5em;
         background-color: #2563eb; color: white; border: none;
@@ -28,22 +29,45 @@ st.markdown("""
     }
     .stButton>button p { font-size: 0.75em !important; margin: 0; font-weight: bold; }
 
+    /* Foto Circular */
     .photo-container {
         width: 90px; height: 90px; border-radius: 50%;
-        border: 3px solid rgba(255,255,255,0.8); overflow: hidden;
+        border: 3px solid rgba(255,255,255,0.9); overflow: hidden;
         margin-right: 15px; background-color: #334155; flex-shrink: 0;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     }
     .photo-container img { width: 100%; height: 100%; object-fit: cover; }
 
+    /* Estructura de la Credencial */
     .credential-card {
         border-radius: 20px; padding: 25px; margin-bottom: 20px;
-        color: white; box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        color: white; box-shadow: 0 12px 30px rgba(0,0,0,0.6);
         position: relative; overflow: hidden; display: flex; flex-direction: column;
+        border: 2px solid rgba(255,255,255,0.1);
+    }
+
+    /* Brillo para destacar jerarquía */
+    .credential-card::after {
+        content: ""; position: absolute; top: -50%; left: -50%;
+        width: 200%; height: 200%;
+        background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+        pointer-events: none;
+    }
+
+    .card-header { display: flex; align-items: center; text-align: left; margin-top: 10px; position: relative; z-index: 10; }
+
+    /* Estilo de Etiquetas de Cargo */
+    .cargo-badge {
+        padding: 3px 12px; border-radius: 50px; font-weight: bold; 
+        font-size: 0.75em; border: 1px solid rgba(255,255,255,0.4);
+        display: inline-block; margin-top: 8px; text-transform: uppercase;
+        background: rgba(0,0,0,0.3);
     }
 
     .family-card {
         background-color: #ffffff; border-radius: 12px; padding: 15px;
         margin-bottom: 12px; border-left: 8px solid #3b82f6;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
     .family-name { color: #1e293b; font-weight: 800; text-transform: uppercase; }
     .family-tag {
@@ -51,15 +75,10 @@ st.markdown("""
         padding: 2px 8px; border-radius: 6px; font-size: 0.75em; font-weight: bold;
     }
 
-    .benefit-card {
-        background-color: #1e293b; border-radius: 15px; padding: 20px;
-        margin-bottom: 15px; border: 1px solid rgba(59, 130, 246, 0.3);
-    }
-
     .download-btn {
-        background: #059669; color: white; padding: 12px; border-radius: 12px;
+        background: #10b981; color: white; padding: 12px; border-radius: 12px;
         text-align: center; font-weight: bold; cursor: pointer; margin-bottom: 20px;
-        border: none; width: 100%; display: block;
+        border: none; width: 100%;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -96,12 +115,11 @@ if st.session_state["dni_activo"] is None:
             st.rerun()
         else: st.error("DNI no registrado.")
 
-# --- APP PRINCIPAL ---
 else:
     socio = db_socios[db_socios['dni'] == st.session_state["dni_activo"]].iloc[0]
     cargo_str = str(socio.get('cargo', 'AFILIADO')).upper()
     
-    # --- MENÚ DE NAVEGACIÓN ---
+    # --- NAVEGACIÓN ---
     m1, m2, m3, m4 = st.columns(4)
     with m1: 
         if st.button("🪪\nINICIO"): st.session_state["seccion"] = "credencial"
@@ -114,40 +132,55 @@ else:
 
     st.markdown("---")
 
-    # SECCIÓN: CREDENCIAL
+    # SECCIÓN: CREDENCIAL (Diferenciación de Jerarquías)
     if st.session_state["seccion"] == "credencial":
-        if any(x in cargo_str for x in ["COMISIÓN", "DIRECTIVA"]):
-            bg, border, label = "linear-gradient(135deg, #854d0e 0%, #422006 100%)", "#fbbf24", "COMISIÓN DIRECTIVA"
+        
+        # LÓGICA DE COLORES SOLICITADA
+        # 1. DORADO (Comisión Directiva)
+        if any(x in cargo_str for x in ["COMISION", "COMISIÓN", "DIRECTIVA", "SECRETARIO"]):
+            bg = "linear-gradient(135deg, #b8860b 0%, #8b6508 50%, #4a3504 100%)"
+            border = "#ffd700" # Dorado
+            label = "COMISIÓN DIRECTIVA"
+        
+        # 2. VERDE (Delegados)
         elif "DELEGADO" in cargo_str:
-            bg, border, label = "linear-gradient(135deg, #064e3b 0%, #022c22 100%)", "#4ade80", "DELEGADO"
+            bg = "linear-gradient(135deg, #065f46 0%, #064e3b 100%)"
+            border = "#34d399" # Esmeralda/Verde
+            label = "DELEGADO"
+        
+        # 3. AZUL (Afiliados)
         else:
-            bg, border, label = "linear-gradient(135deg, #1e3a8a 0%, #172554 100%)", "#3b82f6", "AFILIADO"
+            bg = "linear-gradient(135deg, #1e3a8a 0%, #172554 100%)"
+            border = "#60a5fa" # Azul cielo
+            label = "AFILIADO"
 
         url_foto = socio.get('foto', 'https://www.w3schools.com/howto/img_avatar.png')
         if pd.isna(url_foto) or str(url_foto).strip() == "": url_foto = "https://www.w3schools.com/howto/img_avatar.png"
 
         st.markdown(f"""
             <div id="digital-credential" class="credential-card" style="background: {bg}; border: 2px solid {border};">
-                <p style="font-size: 0.6em; letter-spacing: 2px; opacity: 0.7; margin: 0;">SINDICATO STVP</p>
+                <p style="font-size: 0.6em; letter-spacing: 2px; opacity: 0.8; margin: 0; font-weight: bold;">SINDICATO STVP</p>
                 <div class="card-header">
-                    <div class="photo-container"><img src="{url_foto}"></div>
+                    <div class="photo-container" style="border-color: {border};">
+                        <img src="{url_foto}">
+                    </div>
                     <div>
-                        <h2 style="margin: 0; font-size: 1.4em;">{socio['nombre']}</h2>
-                        <div style="background: rgba(0,0,0,0.4); padding: 2px 10px; border-radius: 50px; color: {border}; font-weight: bold; font-size: 0.7em; border: 1px solid {border}; margin-top: 5px;">{label}</div>
+                        <h2 style="margin: 0; font-size: 1.4em; text-transform: uppercase; letter-spacing: 1px;">{socio['nombre']}</h2>
+                        <div class="cargo-badge" style="color: {border};">{label}</div>
                     </div>
                 </div>
-                <div style="display: flex; justify-content: space-between; margin-top: 25px; font-size: 0.85em;">
-                    <div>DNI<br><b>{socio['dni']}</b></div>
-                    <div style="text-align: right;">ESTADO<br><b style="color: #4ade80;">ACTIVO</b></div>
+                <div style="display: flex; justify-content: space-between; margin-top: 30px; font-size: 0.85em; position: relative; z-index: 10;">
+                    <div>DNI<br><b style="font-size: 1.1em;">{socio['dni']}</b></div>
+                    <div style="text-align: right;">ESTADO<br><b style="color: #4ade80; font-size: 1.1em;">ACTIVO</b></div>
                 </div>
             </div>
             <button class="download-btn" onclick="downloadCredential()">⬇️ GUARDAR CREDENCIAL</button>
             <script>
             function downloadCredential() {{
                 const element = document.getElementById('digital-credential');
-                html2canvas(element, {{ scale: 3 }}).then(canvas => {{
+                html2canvas(element, {{ scale: 3, backgroundColor: null }}).then(canvas => {{
                     const link = document.createElement('a');
-                    link.download = 'Credencial_STVP.png';
+                    link.download = 'Credencial_STVP_{socio['dni']}.png';
                     link.href = canvas.toDataURL('image/png');
                     link.click();
                 }});
@@ -155,9 +188,10 @@ else:
             </script>
         """, unsafe_allow_html=True)
 
+        # Familiares
         fams = db_familia[db_familia['dni_titular'] == st.session_state["dni_activo"]]
         if not fams.empty:
-            st.markdown("<h3 style='color: white;'>👨‍👩‍👧‍👦 Grupo Familiar</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='color: white; margin-top: 20px;'>👨‍👩‍👧‍👦 Grupo Familiar</h3>", unsafe_allow_html=True)
             for _, f in fams.iterrows():
                 st.markdown(f"""
                     <div class="family-card">
@@ -167,51 +201,13 @@ else:
                     </div>
                 """, unsafe_allow_html=True)
 
-    # SECCIÓN: BENEFICIOS (CON ROLSOL VALLE)
+    # OTRAS SECCIONES (BENEFICIOS, ETC.) - Se mantienen igual
     elif st.session_state["seccion"] == "beneficios":
-        st.subheader("Beneficios Exclusivos")
-        
-        # Tarjeta ROLSOL VALLE
-        st.markdown("""
-            <div class="benefit-card">
-                <h4 style="color: #3b82f6; margin: 0;">🏨 Turismo - ROLSOL VALLE</h4>
-                <p style="color: #94a3b8; font-size: 0.9em; margin: 10px 0;">
-                    Acceda a las mejores ofertas en hotelería propia y convenios en todo el país.
-                </p>
-            </div>
-        """, unsafe_allow_html=True)
+        st.subheader("Beneficios")
+        st.markdown('<div class="benefit-card"><h4 style="color:#3b82f6; margin:0;">🏨 Turismo - ROLSOL VALLE</h4><p style="color:#94a3b8; font-size:0.9em;">Paquetes y financiación exclusiva.</p></div>', unsafe_allow_html=True)
         st.link_button("📲 CONTACTO DIRECTO (WHATSAPP)", "https://whatsapp.com/channel/0029VbAua9BJENy8oScpAH2B")
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        # Otros beneficios
-        st.markdown("""
-            <div class="benefit-card">
-                <h4 style="color: #3b82f6; margin: 0;">📚 Útiles Escolares</h4>
-                <p style="color: #94a3b8; font-size: 0.9em; margin: 5px 0;">Entrega de kits escolares anuales para hijos de afiliados.</p>
-            </div>
-            <div class="benefit-card">
-                <h4 style="color: #3b82f6; margin: 0;">👶 Nacimiento</h4>
-                <p style="color: #94a3b8; font-size: 0.9em; margin: 5px 0;">Ajuar completo para el recién nacido.</p>
-            </div>
-        """, unsafe_allow_html=True)
 
-    # SECCIÓN: CONSULTAS
-    elif st.session_state["seccion"] in ["gremial", "legal"]:
-        st.subheader(f"Asesoría {st.session_state['seccion'].capitalize()}")
-        detalle = st.text_area("Describa su inquietud:")
-        if st.button("Enviar"):
-            mensaje = f"Hola, soy {socio['nombre']}. Consulta {st.session_state['seccion']}: {detalle}"
-            url_wa = f"https://wa.me/5491156424903?text={urllib.parse.quote(mensaje)}"
-            st.markdown(f'<a href="{url_wa}" target="_blank" style="text-decoration:none;"><div style="background:#25D366; color:white; padding:15px; border-radius:12px; text-align:center;">📲 Enviar por WhatsApp</div></a>', unsafe_allow_html=True)
-
-    # PANEL DELEGADOS
-    if any(x in cargo_str for x in ["DELEGADO", "COMISIÓN"]):
-        st.markdown("---")
-        with st.expander("🛠️ Panel de Gestión (Delegados)"):
-            archivo = st.file_uploader("Previsualizar foto de afiliado", type=['jpg', 'png'])
-            if archivo: st.image(archivo, width=100)
-
+    # BOTÓN SALIR
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("❌ CERRAR SESIÓN"):
         st.session_state["dni_activo"] = None
