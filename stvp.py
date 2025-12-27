@@ -14,12 +14,13 @@ st.set_page_config(
     layout="centered"
 )
 
-# --- ESTILOS PERSONALIZADOS (CSS) ---
+# --- ESTILOS PERSONALIZADOS (CSS REVISADO) ---
 st.markdown("""
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
     .main { background-color: #0f172a; }
     
+    /* Botones Navegación */
     .stButton>button {
         width: 100%; border-radius: 12px; height: 4.5em;
         background-color: #2563eb; color: white; border: none;
@@ -28,36 +29,37 @@ st.markdown("""
     }
     .stButton>button p { font-size: 0.75em !important; margin: 0; font-weight: bold; }
 
-    /* Foto Circular */
+    /* Contenedor Foto */
     .photo-container {
         width: 95px; height: 95px; border-radius: 50%;
         border: 3px solid rgba(255,255,255,0.9); overflow: hidden;
         margin-right: 15px; background-color: #334155; flex-shrink: 0;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 10;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 5;
     }
     .photo-container img { width: 100%; height: 100%; object-fit: cover; }
 
-    /* Estructura de la Credencial */
+    /* Credencial */
     .credential-card {
         border-radius: 20px; padding: 25px; margin-bottom: 20px;
         color: white; box-shadow: 0 12px 30px rgba(0,0,0,0.6);
         position: relative; overflow: hidden; display: flex; flex-direction: column;
         border: 2px solid rgba(255,255,255,0.1);
+        min-height: 220px;
     }
 
-    /* Marca de Agua (Logo de Fondo) */
+    /* Marca de Agua con Logo */
     .watermark {
         position: absolute; top: 50%; left: 50%;
         transform: translate(-50%, -50%) rotate(-15deg);
-        width: 220px; opacity: 0.12; z-index: 1; pointer-events: none;
+        width: 200px; opacity: 0.12; z-index: 0; pointer-events: none;
     }
 
-    .card-content { position: relative; z-index: 10; }
+    .card-content { position: relative; z-index: 2; }
     .card-header { display: flex; align-items: center; text-align: left; margin-top: 10px; }
 
     .cargo-badge {
-        padding: 3px 12px; border-radius: 50px; font-weight: bold; 
-        font-size: 0.75em; border: 1px solid rgba(255,255,255,0.4);
+        padding: 4px 12px; border-radius: 50px; font-weight: bold; 
+        font-size: 0.7em; border: 1px solid rgba(255,255,255,0.4);
         display: inline-block; margin-top: 8px; text-transform: uppercase;
         background: rgba(0,0,0,0.3);
     }
@@ -67,18 +69,22 @@ st.markdown("""
         text-align: center; font-weight: bold; cursor: pointer; margin-bottom: 20px;
         border: none; width: 100%;
     }
+
+    .family-card {
+        background-color: #ffffff; border-radius: 12px; padding: 15px;
+        margin-bottom: 12px; border-left: 8px solid #3b82f6;
+    }
     </style>
 """, unsafe_allow_html=True)
 
-# --- UTILIDADES ---
+# --- CARGA DE IMÁGENES LOCALES ---
 def get_image_base64(path_no_ext):
-    posibles_ext = ['png', 'jpg', 'jpeg', 'webp']
-    for ext in posibles_ext:
+    for ext in ['png', 'jpg', 'jpeg']:
         full_path = f"{path_no_ext}.{ext}"
         if os.path.exists(full_path):
             with open(full_path, "rb") as img_file:
                 return f"data:image/{ext};base64," + base64.b64encode(img_file.read()).decode()
-    return None
+    return ""
 
 # --- CARGA DE DATOS ---
 @st.cache_data(ttl=300)
@@ -94,51 +100,46 @@ def cargar_datos():
             col = 'dni' if 'dni' in df.columns else 'dni_titular'
             df[col] = df[col].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
         return df_s, df_f
-    except: return pd.DataFrame(), pd.DataFrame()
+    except Exception as e:
+        st.error(f"Error cargando datos: {e}")
+        return pd.DataFrame(), pd.DataFrame()
 
 db_socios, db_familia = cargar_datos()
 
 if "dni_activo" not in st.session_state: st.session_state["dni_activo"] = None
 if "seccion" not in st.session_state: st.session_state["seccion"] = "credencial"
 
-# --- CABECERA CON LOGO ---
 logo_b64 = get_image_base64("logo_stvp")
 
-# --- LOGIN ---
+# --- FLUJO DE LOGIN ---
 if st.session_state["dni_activo"] is None:
     col1, col2, col3 = st.columns([1, 1.5, 1])
     with col2:
         if logo_b64: st.image(logo_b64, use_container_width=True)
-    st.markdown("<h1 style='text-align: center; color: white;'>STVP Digital</h1>", unsafe_allow_html=True)
-    dni_input = st.text_input("Ingrese su DNI:")
+    st.markdown("<h2 style='text-align: center; color: white;'>Sindicato STVP</h2>", unsafe_allow_html=True)
+    dni_input = st.text_input("Ingrese su DNI para acceder:")
     if st.button("INGRESAR"):
         dni_clean = str(dni_input).replace(".", "").replace(" ", "").strip()
         if not db_socios.empty and dni_clean in db_socios['dni'].values:
             st.session_state["dni_activo"] = dni_clean
             st.rerun()
-        else: st.error("DNI no registrado.")
+        else: st.error("El DNI ingresado no se encuentra en el padrón.")
 
 else:
     socio = db_socios[db_socios['dni'] == st.session_state["dni_activo"]].iloc[0]
     
-    # --- DETERMINAR RANGO POR COLUMNA 'MIEMBRO' ---
-    # Convertimos a string y mayúsculas para evitar errores
-    miembro_tipo = str(socio.get('miembro', 'AFILIADO')).upper()
+    # --- LOGICA DE COLORES POR COLUMNA 'MIEMBRO' ---
+    # Usamos .strip() para evitar errores por espacios invisibles en el Excel
+    m_tipo = str(socio.get('miembro', 'AFILIADO')).upper().strip()
     
-    if any(x in miembro_tipo for x in ["COMISION", "COMISIÓN", "DIRECTIVA"]):
-        bg = "linear-gradient(135deg, #b8860b 0%, #8b6508 50%, #4a3504 100%)"
-        border = "#ffd700"
-        label = "COMISIÓN DIRECTIVA"
-    elif "DELEGADO" in miembro_tipo:
-        bg = "linear-gradient(135deg, #065f46 0%, #064e3b 100%)"
-        border = "#34d399"
-        label = "DELEGADO"
+    if any(x in m_tipo for x in ["COMISION", "COMISIÓN", "DIRECTIVA", "SECRETARIO"]):
+        bg, border, label = "linear-gradient(135deg, #b8860b 0%, #4a3504 100%)", "#ffd700", "COMISIÓN DIRECTIVA"
+    elif "DELEGADO" in m_tipo:
+        bg, border, label = "linear-gradient(135deg, #065f46 0%, #064e3b 100%)", "#34d399", "DELEGADO"
     else:
-        bg = "linear-gradient(135deg, #1e3a8a 0%, #172554 100%)"
-        border = "#60a5fa"
-        label = "AFILIADO"
+        bg, border, label = "linear-gradient(135deg, #1e3a8a 0%, #172554 100%)", "#60a5fa", "AFILIADO"
 
-    # --- NAVEGACIÓN ---
+    # --- BARRA DE NAVEGACIÓN ---
     m1, m2, m3, m4 = st.columns(4)
     with m1: 
         if st.button("🪪\nINICIO"): st.session_state["seccion"] = "credencial"
@@ -153,35 +154,40 @@ else:
 
     # SECCIÓN: CREDENCIAL
     if st.session_state["seccion"] == "credencial":
-        url_foto = socio.get('foto', 'https://www.w3schools.com/howto/img_avatar.png')
-        if pd.isna(url_foto) or str(url_foto).strip() == "": url_foto = "https://www.w3schools.com/howto/img_avatar.png"
+        url_foto = socio.get('foto', '')
+        if pd.isna(url_foto) or str(url_foto).strip() == "": 
+            url_foto = "https://www.w3schools.com/howto/img_avatar.png"
 
-        # HTML de la Credencial
         st.markdown(f"""
             <div id="digital-credential" class="credential-card" style="background: {bg}; border: 2px solid {border};">
                 <img src="{logo_b64}" class="watermark">
                 <div class="card-content">
-                    <p style="font-size: 0.6em; letter-spacing: 2px; opacity: 0.8; margin: 0; font-weight: bold;">SINDICATO STVP</p>
+                    <p style="font-size: 0.6em; letter-spacing: 2px; opacity: 0.9; margin: 0; font-weight: bold;">SINDICATO STVP</p>
                     <div class="card-header">
                         <div class="photo-container" style="border-color: {border};">
-                            <img src="{url_foto}">
+                            <img src="{url_foto}" crossorigin="anonymous">
                         </div>
                         <div>
-                            <h2 style="margin: 0; font-size: 1.4em; text-transform: uppercase;">{socio['nombre']}</h2>
+                            <h2 style="margin: 0; font-size: 1.3em; text-transform: uppercase; line-height: 1;">{socio['nombre']}</h2>
                             <div class="cargo-badge" style="color: {border};">{label}</div>
                         </div>
                     </div>
-                    <div style="display: flex; justify-content: space-between; margin-top: 30px; font-size: 0.85em;">
+                    <div style="display: flex; justify-content: space-between; margin-top: 35px; font-size: 0.85em;">
                         <div>DNI<br><b style="font-size: 1.1em;">{socio['dni']}</b></div>
                         <div style="text-align: right;">ESTADO<br><b style="color: #4ade80; font-size: 1.1em;">ACTIVO</b></div>
                     </div>
                 </div>
             </div>
-            <button class="download-btn" onclick="downloadCredential()">⬇️ GUARDAR CREDENCIAL</button>
+            <button class="download-btn" onclick="downloadCredential()">⬇️ GUARDAR CREDENCIAL COMO IMAGEN</button>
             <script>
             function downloadCredential() {{
                 const element = document.getElementById('digital-credential');
-                html2canvas(element, {{ scale: 3, backgroundColor: null, useCORS: true }}).then(canvas => {{
+                html2canvas(element, {{ 
+                    scale: 3, 
+                    backgroundColor: null,
+                    useCORS: true,
+                    allowTaint: true
+                }}).then(canvas => {{
                     const link = document.createElement('a');
                     link.download = 'Credencial_STVP_{socio['dni']}.png';
                     link.href = canvas.toDataURL('image/png');
@@ -196,25 +202,37 @@ else:
         if not fams.empty:
             st.markdown("<h3 style='color: white;'>👨‍👩‍👧‍👦 Grupo Familiar</h3>", unsafe_allow_html=True)
             for _, f in fams.iterrows():
-                st.markdown(f"""<div class="family-card"><div class="family-name">{f['nombre']}</div><div style="color:#475569; font-size:0.9em;">DNI: {f.get('dni_familiar','N/A')}</div><div class="family-tag">{str(f.get('parentesco','Familiar')).upper()}</div></div>""", unsafe_allow_html=True)
+                st.markdown(f"""
+                    <div class="family-card">
+                        <div class="family-name">{f['nombre']}</div>
+                        <div style="color: #475569; font-size: 0.9em;">DNI: {f.get('dni_familiar','N/A')}</div>
+                        <div class="family-tag">{str(f.get('parentesco','Familiar')).upper()}</div>
+                    </div>
+                """, unsafe_allow_html=True)
 
     # SECCIÓN: BENEFICIOS
     elif st.session_state["seccion"] == "beneficios":
-        st.subheader("Beneficios")
-        st.markdown('<div style="background:#1e293b; padding:15px; border-radius:15px; border:1px solid #3b82f6;"><h4>🏨 Turismo - ROLSOL VALLE</h4><p>Acceso a convenios y hotelería.</p></div>', unsafe_allow_html=True)
-        st.link_button("📲 CONTACTO DIRECTO (WHATSAPP)", "https://whatsapp.com/channel/0029VbAua9BJENy8oScpAH2B")
+        st.subheader("Beneficios y Convenios")
+        st.markdown("""
+            <div style="background:#1e293b; padding:20px; border-radius:15px; border-left: 5px solid #3b82f6;">
+                <h4 style="color:#3b82f6; margin:0;">🏨 Turismo - ROLSOL VALLE</h4>
+                <p style="color:#94a3b8; font-size:0.95em;">Acceda a hotelería propia y paquetes turísticos exclusivos para el afiliado y su familia.</p>
+            </div>
+        """, unsafe_allow_html=True)
+        st.link_button("📲 VER NOVEDADES EN WHATSAPP", "https://whatsapp.com/channel/0029VbAua9BJENy8oScpAH2B")
 
-    # --- PANEL ADMIN (FORZAR ACTUALIZACIÓN) ---
-    st.markdown("---")
-    with st.expander("⚙️ Administración"):
-        pwd = st.text_input("Contraseña de administrador", type="password")
+    # --- PANEL ADMIN (STVP2026) ---
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    with st.expander("🛠️ Configuración de Sistema"):
+        pwd = st.text_input("Ingrese clave de administrador:", type="password")
         if pwd == "Stvp2026":
-            if st.button("🔄 FORZAR ACTUALIZACIÓN DE DATOS"):
+            st.success("Acceso concedido")
+            if st.button("🔄 RECARGAR TODA LA BASE DE DATOS"):
                 st.cache_data.clear()
-                st.success("¡Datos actualizados correctamente desde Google Sheets!")
+                st.toast("Datos actualizados desde Google Sheets")
                 st.rerun()
         elif pwd != "":
-            st.error("Contraseña incorrecta")
+            st.error("Clave incorrecta")
 
     if st.button("❌ CERRAR SESIÓN"):
         st.session_state["dni_activo"] = None
