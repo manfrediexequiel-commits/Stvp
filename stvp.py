@@ -51,16 +51,26 @@ st.markdown("""
     }
     .photo-container img { width: 100%; height: 100%; object-fit: cover; }
 
-    .whatsapp-btn {
-        background-color: #25D366; color: white !important;
-        padding: 15px; border-radius: 12px; text-align: center;
-        font-weight: bold; text-decoration: none; display: block;
-        margin-top: 10px; border: none;
+    /* Estilo Botón WhatsApp Corregido */
+    .wa-link {
+        display: block;
+        background-color: #25D366;
+        color: white !important;
+        text-align: center;
+        padding: 15px;
+        border-radius: 12px;
+        font-weight: bold;
+        text-decoration: none;
+        margin-bottom: 10px;
+        border: 1px solid #128C7E;
+    }
+    .wa-link:hover {
+        background-color: #128C7E;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- UTILIDADES DE IMAGEN ---
+# --- UTILIDADES ---
 def get_image_base64(path_no_ext):
     for ext in ['png', 'jpg', 'jpeg']:
         full_path = f"{path_no_ext}.{ext}"
@@ -71,7 +81,6 @@ def get_image_base64(path_no_ext):
 
 logo_b64 = get_image_base64("logo_stvp")
 
-# --- CARGA DE DATOS ---
 @st.cache_data(ttl=300)
 def cargar_datos():
     URL_SOCIOS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRT80rJKxr62o2RBs5PpaCvpWbyH2B14dk1Gv610WH3QPoeQi2akdeu4Kgo97Mtq-QOmB8d3ORap8-n/pub?gid=0&single=true&output=csv"
@@ -92,11 +101,11 @@ db_socios, db_familia = cargar_datos()
 if "dni_activo" not in st.session_state: st.session_state["dni_activo"] = None
 if "seccion" not in st.session_state: st.session_state["seccion"] = "credencial"
 
-# --- FLUJO PRINCIPAL ---
-# Mostrar siempre el logo en la parte superior
+# --- LOGO SUPERIOR ---
 if logo_b64:
     st.markdown(f'<div style="text-align: center;"><img src="{logo_b64}" width="120"></div>', unsafe_allow_html=True)
 
+# --- LOGIN ---
 if st.session_state["dni_activo"] is None:
     st.markdown("<h2 style='text-align: center; color: white;'>Sindicato STVP</h2>", unsafe_allow_html=True)
     dni_input = st.text_input("Ingrese su DNI:")
@@ -107,6 +116,7 @@ if st.session_state["dni_activo"] is None:
             st.rerun()
         else: st.error("DNI no registrado.")
 
+# --- APP ---
 else:
     socio = db_socios[db_socios['dni'] == st.session_state["dni_activo"]].iloc[0]
     
@@ -123,7 +133,7 @@ else:
 
     st.markdown("---")
 
-    # SECCIÓN: CREDENCIAL
+    # SECCIÓN: INICIO / CREDENCIAL
     if st.session_state["seccion"] == "credencial":
         m_tipo = str(socio.get('miembro', 'AFILIADO')).upper().strip()
         if any(x in m_tipo for x in ["COMISION", "COMISIÓN", "DIRECTIVA"]):
@@ -166,26 +176,33 @@ else:
             </script>
         """, unsafe_allow_html=True)
 
-    # SECCIONES GREMIAL Y LEGAL
+    # SECCIÓN: GREMIAL Y LEGAL (BOTONES CORREGIDOS)
     elif st.session_state["seccion"] in ["gremial", "legal"]:
-        tipo = "Gremial" if st.session_state["seccion"] == "gremial" else "Legal"
-        st.subheader(f"Asesoría {tipo}")
-        st.write(f"Para consultas {tipo.lower()}s urgentes, contacte a nuestros representantes:")
+        tipo_header = "Gremial" if st.session_state["seccion"] == "gremial" else "Legal"
+        st.subheader(f"Asesoría {tipo_header}")
         
-        # Botón para el primer número
-        url_wa1 = f"https://wa.me/5491161080024?text=Consulta%20{tipo}:%20Hola,%20soy%20{urllib.parse.quote(socio['nombre'])}"
-        st.markdown(f'<a href="{url_wa1}" target="_blank" class="whatsapp-btn">📲 Contactar Gremial (+54 9 11 6108-0024)</a>', unsafe_allow_html=True)
+        st.info("Seleccione un representante para iniciar la consulta por WhatsApp:")
         
-        # Botón para el segundo número
-        url_wa2 = f"https://wa.me/5491156424903?text=Consulta%20{tipo}:%20Hola,%20soy%20{urllib.parse.quote(socio['nombre'])}"
-        st.markdown(f'<a href="{url_wa2}" target="_blank" class="whatsapp-btn">📲 Contactar Soporte (+54 9 11 5642-4903)</a>', unsafe_allow_html=True)
+        # Preparamos el mensaje
+        nombre_afiliado = socio['nombre']
+        msg = urllib.parse.quote(f"Hola, mi nombre es {nombre_afiliado}. Necesito realizar una consulta {tipo_header.lower()}.")
+        
+        # Link 1: Gremial
+        st.markdown(f"""<a class="wa-link" href="https://wa.me/5491161080024?text={msg}" target="_blank">📲 Contactar Gremial (+54 9 11 6108-0024)</a>""", unsafe_allow_html=True)
+        
+        # Link 2: Soporte
+        st.markdown(f"""<a class="wa-link" href="https://wa.me/5491156424903?text={msg}" target="_blank">📲 Contactar Soporte (+54 9 11 5642-4903)</a>""", unsafe_allow_html=True)
 
-    # SECCIÓN BENEFICIOS
+    # SECCIÓN: BENEFICIOS
     elif st.session_state["seccion"] == "beneficios":
         st.subheader("Beneficios")
-        st.info("Presente su credencial para acceder a:")
-        st.markdown("🏨 **Turismo ROLSOL VALLE**")
-        st.link_button("📲 CANAL DE WHATSAPP", "https://whatsapp.com/channel/0029VbAua9BJENy8oScpAH2B")
+        st.markdown("""
+            <div style="background:#1e293b; padding:15px; border-radius:15px; border-left: 5px solid #3b82f6; margin-bottom:15px;">
+                <h4 style="color:#3b82f6; margin:0;">🏨 Turismo - ROLSOL VALLE</h4>
+                <p style="color:#94a3b8; font-size:0.9em;">Acceso a paquetes turísticos exclusivos.</p>
+            </div>
+        """, unsafe_allow_html=True)
+        st.markdown(f"""<a class="wa-link" href="https://whatsapp.com/channel/0029VbAua9BJENy8oScpAH2B" target="_blank">📲 VER NOVEDADES EN WHATSAPP</a>""", unsafe_allow_html=True)
 
     # PANEL ADMIN
     st.markdown("---")
